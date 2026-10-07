@@ -1,0 +1,142 @@
+/* 앱 뼈대: 왼쪽 아지트 레일 | 방 목록 | 본문
+ *
+ *  ┌──────┬───────────┬─────────────────────────┐
+ *  │ rail │ side      │ main                    │
+ *  │ 76px │ 256px     │ .head (60px)            │
+ *  │      │           │ 본문 (채팅, 설정 ...)    │
+ *  └──────┴───────────┴─────────────────────────┘
+ */
+
+.shell { display: flex; height: 100%; min-width: 0; }
+
+/* ---------- 레일: 아지트 하나 = 네모 하나 ---------- */
+.rail {
+  width: 76px;
+  flex-shrink: 0;
+  padding: 14px 0;
+  border-right: 1px solid var(--line);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.rail-logo { width: 58px; margin-bottom: 6px; }
+.rail-bottom { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+/* 레일 버튼: 평소엔 동그라미, 고르면 둥근 네모 + 아지트 색 */
+.rbtn {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 24px;
+  background: var(--s2);
+  color: var(--tx);
+  font-family: var(--font-disp);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-radius .15s;
+}
+.rbtn:hover { border-radius: 16px; }
+.rbtn.on { border-radius: 16px; color: var(--on-accent); }
+.rbtn .badge { position: absolute; right: -4px; top: -4px; border: 2px solid var(--bg); }
+.rbtn.add { border: 1.5px dashed var(--line-dash); background: transparent; color: var(--lime); }
+.rbtn.sm { width: 44px; height: 44px; }
+.rbtn.sm.on { background: var(--tx); }
+
+/* ---------- 방 목록 ---------- */
+.side {
+  width: 256px;
+  flex-shrink: 0;
+  min-height: 0;
+  border-right: 1px solid var(--line);
+  background: var(--s1);
+  display: flex;
+  flex-direction: column;
+}
+.side-top { padding: 14px 14px 10px; display: flex; flex-direction: column; gap: 10px; }
+.side-azit { display: flex; align-items: flex-start; gap: 10px; }
+.side-azit-name { font-family: var(--font-disp); font-size: 15px; line-height: 1.3; word-break: keep-all; overflow-wrap: anywhere; }
+.side-azit-meta { font-size: 11px; font-weight: 800; color: var(--mu); }
+
+.search {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--mu);
+}
+.search input { width: 100%; border: 0; background: transparent; outline: none; font-size: 13px; color: var(--tx); }
+
+.room-nav { flex: 1; padding: 0 8px 8px; }
+.room-empty { padding: 12px; }
+
+.roomrow {
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--tx);
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.roomrow:hover { background: var(--s2); }
+.roomrow.on { background: var(--s3); }
+.roomrow-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.roomrow-name { font-weight: 800; font-size: 14px; }
+.roomrow-preview { font-size: 12px; color: var(--mu); }
+.roomrow-live { color: var(--pink); font-weight: 800; }
+.roomrow-meta { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.roomrow-time { font-size: 10px; color: var(--mu); }
+.roomrow-meta .spacer { height: 20px; }
+
+.side-foot { padding: 10px 12px; border-top: 1px solid var(--line); display: flex; gap: 6px; }
+
+/* ---------- 본문 ---------- */
+.main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.head {
+  height: 60px;
+  flex-shrink: 0;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.head-title { font-size: 18px; font-weight: 800; }
+.page { flex: 1; min-height: 0; padding: 24px 28px; }
+
+/* ---------- 창 폭에 따라 ---------- */
+.show-sm { display: none !important; }
+@media (max-width: 980px) {
+  .side { width: 210px; }
+  .hide-md { display: none !important; }
+  .page { padding: 18px; }
+}
+@media (max-width: 720px) {
+  .side { display: none; }
+  .grid3, .grid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .show-sm { display: flex !important; }
+}
+
+/* ---------- 작게 보기 ----------
+ * 창을 400px 폭으로 줄여 옆에 띄워 두는 모드. 방 목록과 본문 중 하나만 보인다.
+ * 실제 창 크기는 Go(Wails)가 바꾸고, 화면은 .shell 에 .mini 를 붙여 맞춘다. */
+.mini .rail { width: 58px; gap: 8px; padding: 10px 0; }
+.mini .rail-logo { width: 44px; }
+.mini .rbtn { width: 40px; height: 40px; font-size: 12px; }
+.mini .side { display: flex; width: auto; flex: 1 1 auto; border-right: 0; }
+.mini .grid2, .mini .grid3, .mini .grid4 { grid-template-columns: minmax(0, 1fr); }
+.mini .hide-md { display: none !important; }
+.mini .show-sm { display: flex !important; }
+.mini .page { padding: 16px; }
+.mini .head { padding: 0 12px; }

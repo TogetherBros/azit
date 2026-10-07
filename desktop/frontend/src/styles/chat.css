@@ -1,0 +1,258 @@
+/* 채팅: 메시지 목록, 말풍선, 시스템 메시지, 입력창과 그 위에 뜨는 메뉴들 */
+
+.chat-body { flex: 1; padding: 8px 0 14px; display: flex; flex-direction: column; gap: 4px; }
+.chat-empty { flex: 1; padding: 40px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.chat-empty-title { font-family: var(--font-disp); font-size: 22px; }
+
+/* 날짜 구분선 ── 10월 7일 화요일 ── */
+.datediv {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--mu);
+}
+.datediv::before, .datediv::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+/* ---------- 메시지 한 줄 ----------
+ * [아바타] 이름 칭호
+ *          [말풍선] 12:30
+ *          맞장구들
+ * 내 메시지(.me)는 좌우가 뒤집히고 아바타·이름이 없다.
+ * 같은 사람이 1분 안에 이어 보내면(.cont) 아바타·이름을 생략하고 자리만 비운다. */
+.msg { position: relative; display: flex; gap: 10px; align-items: flex-start; padding: 4px 20px; }
+.msg:hover { background: rgba(255, 255, 255, .02); }
+.msg.me { flex-direction: row-reverse; }
+.msg-av-gap { width: 34px; flex-shrink: 0; }
+.msg-col { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.msg.me .msg-col { align-items: flex-end; }
+.msg-name { font-size: 12px; font-weight: 800; }
+.msg-title { margin-left: 4px; font-size: 11px; color: var(--lime); }
+.msg-line { display: flex; align-items: flex-end; gap: 6px; }
+.msg.me .msg-line { flex-direction: row-reverse; }
+.msg-time { flex-shrink: 0; font-size: 10px; color: var(--mu); }
+.msg-shook { font-size: 11px; font-weight: 800; color: var(--lime); }
+.msg-reacts { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* 말풍선: 남의 것은 왼쪽 위 모서리, 내 것은 오른쪽 위 모서리가 뾰족 */
+.bub {
+  max-width: 520px;
+  padding: 9px 13px;
+  border-radius: 4px 18px 18px 18px;
+  background: var(--s2);
+  font-size: 15px;
+  line-height: 1.45;
+  word-break: break-word;
+  white-space: pre-wrap;
+  user-select: text;
+}
+.me .bub { border-radius: 18px 4px 18px 18px; background: var(--lime); color: var(--on-accent); }
+.bub.deleted, .me .bub.deleted {
+  background: transparent;
+  border: 1.5px dashed var(--line2);
+  color: var(--mu);
+  font-style: italic;
+}
+
+/* @이름 = 흔들기. 나를 부른 건(.mine) 꽉 찬 라임 */
+.mention {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 11px;
+  background: var(--limebg);
+  color: var(--lime);
+  font-size: 13px;
+  font-weight: 800;
+  vertical-align: baseline;
+}
+.mention.mine { background: var(--lime); color: var(--on-accent); }
+.me .mention { background: var(--bg); color: var(--lime); }
+
+/* 맞장구 (메시지 아래 붙은 것) */
+.react {
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 13px;
+  border: 1.5px solid var(--line2);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.react.on { border-color: var(--lime); color: var(--lime); }
+.rimg { width: 18px; height: 18px; object-fit: contain; }
+
+/* 마우스 올리면 오른쪽 위에 뜨는 메뉴: 맞장구들 · 흔들며 답하기 · 지우기 */
+.acts {
+  display: none;
+  position: absolute;
+  right: 20px;
+  top: -14px;
+  z-index: 2;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 12px;
+  border: 1px solid var(--line2);
+  background: var(--s2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
+}
+.msg:hover .acts, .msg:focus-within .acts { display: flex; }
+.acts button { height: 30px; padding: 0 9px; border: 0; border-radius: 9px; background: transparent; font-size: 12px; font-weight: 800; }
+.acts button:hover { background: var(--s3); }
+.acts .lime { color: var(--lime); }
+.acts .red { color: var(--red); }
+
+/* 시스템 메시지: 가운데 알약 모양 ("추승주가 MK7Q2X로 들어왔어요") */
+.sysm {
+  align-self: center;
+  max-width: 80%;
+  min-height: 30px;
+  margin: 4px auto;
+  padding: 4px 12px;
+  border-radius: 15px;
+  border: 1px solid var(--line);
+  background: var(--s1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mu);
+  text-align: center;
+}
+.sysm-icon { color: var(--pink); display: flex; }
+.sysm .plain { color: var(--pink); font-size: 12px; }
+
+/* ---------- 입력창: [+] · 입력칸 · 보내기 ---------- */
+.composer { position: relative; flex-shrink: 0; padding: 10px 14px 14px; border-top: 1px solid var(--line); }
+.composer-input { height: 46px; min-height: 46px; max-height: 140px; padding: 12px 14px; line-height: 1.4; resize: none; }
+textarea.composer-input { resize: none; }
+
+/* 입력창 위에 뜨는 메뉴 위치 */
+.composer .popup { bottom: 66px; left: 14px; }
+.composer .popup.narrow { width: min(260px, calc(100% - 28px)); }
+.composer .popup.mention { width: min(280px, calc(100% - 28px)); }
+.composer .popup.wide { right: 14px; padding: 12px; max-height: 340px; }
+.popup-bar { padding: 0 4px 10px; display: flex; align-items: center; gap: 8px; }
+
+/* + 메뉴 항목: 색 네모 아이콘 + 이름/설명 */
+.plus-item { height: 48px; }
+.plus-ic { width: 30px; height: 30px; border-radius: 10px; color: var(--on-accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.plus-ic.lime { background: var(--lime); }
+.plus-ic.pink { background: var(--pink); }
+.plus-ic.sky { background: var(--sky); }
+.plus-ic.grape { background: var(--grape); }
+.plus-name { font-weight: 800; font-size: 13px; }
+.plus-desc { font-size: 11px; color: var(--mu); }
+
+/* 짤 고르기 (MVP 2) */
+.stgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; max-height: 250px; }
+.stbtn { aspect-ratio: 1; padding: 6px; border: 0; border-radius: 16px; background: var(--s3); display: flex; align-items: center; justify-content: center; }
+.stbtn:hover:not(:disabled) { background: var(--s3-hover); }
+.stbtn img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+/* 게임 고르기: 옆으로 넘기는 카드 (MVP 3) */
+.gstrip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding: 2px 2px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line2) transparent;
+}
+.gcard {
+  flex: 0 0 156px;
+  scroll-snap-align: start;
+  padding: 10px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--s3);
+  color: var(--tx);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gcard:hover:not(:disabled) { background: var(--s3-hover); }
+.gcard:disabled { opacity: .6; }
+.gart { height: 76px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-family: var(--font-disp); font-size: 30px; }
+.gcard-name { font-weight: 800; font-size: 14px; }
+.gcard-desc { font-size: 11px; line-height: 1.4; color: var(--mu); }
+.gcard .tag { align-self: flex-start; }
+
+/* ---------- 작게 보기 ---------- */
+.mini .msg { padding: 3px 12px; }
+.mini .bub { max-width: 230px; font-size: 14px; }
+.mini .acts { right: 12px; }
+
+/* ---------- 말풍선 말고 다른 본문들 ---------- */
+.msg-img { max-width: 240px; max-height: 280px; border-radius: 14px; }
+.msg-sticker { width: 120px; height: 120px; object-fit: contain; }
+
+/* 라이어 판 카드: 열려 있으면 핑크, 끝나면 회색 */
+.liar-card {
+  width: min(380px, 100%);
+  padding: 14px 16px;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--pink);
+  color: var(--on-accent);
+}
+.liar-card.done { background: var(--s2); color: var(--tx); }
+.liar-card-title { flex: 1; font-family: var(--font-disp); font-size: 20px; }
+.liar-card-info { font-size: 12px; font-weight: 800; }
+.liar-card-result { font-size: 13px; }
+.liar-card .tag { background: var(--bg); color: var(--pink); }
+.liar-card.done .tag { background: var(--s3); color: var(--mu); }
+.liar-card .btn.on-pink { background: var(--bg); color: var(--pink); }
+.liar-card .btn.ghost-pink { background: rgba(14, 14, 18, .15); color: var(--on-accent); }
+.liar-card.done .btn.ghost-pink { background: var(--s3); color: var(--tx); }
+
+/* 돌림판 결과 */
+.wheel-card, .poll-card { width: min(400px, 100%); display: flex; flex-direction: column; gap: 10px; }
+.wheel-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.wheel-opt {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 800;
+  background: var(--s3);
+  color: var(--mu);
+}
+.wheel-opt.win { background: var(--pink); color: var(--on-accent); box-shadow: 0 0 0 3px var(--s2), 0 0 0 5px var(--pink); }
+
+/* 투표: 보기마다 뒤에 비율 막대 */
+.poll-card { gap: 8px; }
+.poll-q { flex: 1; font-size: 14px; font-weight: 800; }
+.poll-opt {
+  position: relative;
+  overflow: hidden;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line2);
+  background: transparent;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+}
+.poll-opt.mine { border-color: var(--sky); }
+.poll-bar { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(123, 196, 255, .15); }
+.poll-opt > span:not(.poll-bar) { position: relative; }
+.poll-count { font-family: var(--font-mono); font-size: 11px; }

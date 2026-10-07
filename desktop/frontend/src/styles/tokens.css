@@ -1,0 +1,47 @@
+/* 아지트 디자인 토큰.
+ * 색마다 뜻이 정해져 있다 (프로젝트 개요 "디자인 원칙"). 컴포넌트에 #D4FF3A 같은 값을 직접 쓰지 않는다.
+ * 앱은 다크 전용이라 라이트 테마는 두지 않는다. */
+:root {
+  /* 바탕과 면 — 숫자가 클수록 위에 떠 있는 면 */
+  --bg: #0E0E12;        /* 앱 바탕 (강조색 전부 대비 4.5:1 이상) */
+  --s1: #17171D;        /* 방 목록, 카드, 모달 */
+  --s2: #212129;        /* 말풍선, 팝업, 작은 카드 */
+  --s3: #2A2A34;        /* 보조 버튼, 선택된 줄 */
+  --s3-hover: #34343F;
+  --line: #2E2E38;      /* 구분선 */
+  --line2: #3A3A46;     /* 입력칸 테두리 */
+  --line-dash: #4A4A58; /* 점선 버튼 */
+
+  /* 글자 */
+  --tx: #F4F4F6;
+  --mu: #A3A3B2;        /* 흐린 글자: 시간, 설명 */
+  --tx-off: #6E6E7C;    /* 비활성 */
+  --on-accent: #0E0E12; /* 강조색 위의 글자 */
+
+  /* 강조색 */
+  --lime: #D4FF3A;      /* 주요 행동, 내 것, 선택됨, 로고 */
+  --lime-hover: #E3FF7A;
+  --limebg: #20260F;
+  --pink: #FF5FA8;      /* 라이어게임, 흔들기, 안 읽은 수 */
+  --pink-hover: #FF86BE;
+  --pinkbg: #2A1A24;
+  --orange: #FF8A3D;    /* 경고, 연결 끊김 */
+  --orbg: #2A1E14;
+  --red: #FF8A8A;       /* 오류, 지우기, 내보내기 */
+  --redbg: #2A1A1E;
+  --red-hover: #3A2026;
+  --red-field: #1E1418;
+  --sky: #7BC4FF;       /* 사진, 투표 */
+  --skybg: #1A2030;
+  --grape: #B79CFF;     /* 짤 */
+  --grapebg: #221C33;
+
+  /* 폰트: 제목 Bagel Fat One(18px 이상), 본문 Pretendard, 코드·숫자 Space Mono(한글 금지) */
+  --font-body: 'Pretendard Variable', Pretendard, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+  --font-disp: 'Bagel Fat One', var(--font-body);
+  --font-mono: 'Space Mono', ui-monospace, monospace;
+
+  /* 그림자 */
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, .55);
+  --shadow-modal: 0 24px 80px rgba(0, 0, 0, .6);
+}

@@ -1,0 +1,8 @@
+/* 스타일 진입점. 순서가 중요하다: 토큰 → 리셋 → 공용 부품 → 화면별 */
+@import './tokens.css';
+@import './base.css';
+@import './components.css';
+@import './layout.css';
+@import './chat.css';
+@import './auth.css';
+@import './screens.css';

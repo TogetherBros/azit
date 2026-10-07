@@ -1,0 +1,65 @@
+/* 리셋과 공용 유틸리티. 특정 컴포넌트를 모르는 것만 둔다. */
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--tx);
+  font-family: var(--font-body);
+  font-size: 14px;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, p, ol, ul { margin: 0; }
+ol, ul { padding: 0; list-style: none; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+img { display: block; max-width: 100%; }
+:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+
+/* 글꼴 */
+.disp { font-family: var(--font-disp); font-weight: 400; }
+.mono { font-family: var(--font-mono); }
+.mu { color: var(--mu); }
+.b { font-weight: 800; }
+
+/* 화면엔 안 보이고 스크린리더만 읽는 글자 */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* 배치 */
+.row { display: flex; align-items: center; gap: 8px; }
+.col { display: flex; flex-direction: column; gap: 8px; }
+.wrap { flex-wrap: wrap; }
+.grow { flex: 1 1 auto; min-width: 0; }
+.center { display: flex; align-items: center; justify-content: center; }
+.end { justify-content: flex-end; }
+.ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+
+.scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line2) transparent;
+}
+
+/* 움직임 */
+.hl { animation: hl 1.8s ease-out; }  /* 알림 눌러서 온 메시지 강조 */
+@keyframes hl { 0% { background: rgba(212, 255, 58, .25); } 100% { background: transparent; } }
+
+.shake { animation: shk .6s; }        /* 흔들기 받았을 때 창 전체 */
+@keyframes shk {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-8px); }
+  40%, 60% { transform: translateX(8px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shake, .hl { animation: none; }
+  .btn { transition: none; }
+}
