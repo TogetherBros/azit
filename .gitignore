@@ -1,0 +1,15 @@
+/bin/
+*.exe
+*.db
+*.db-wal
+*.db-shm
+.env
+node_modules/
+desktop/frontend/dist/
+desktop/build/bin/
+.idea/workspace.xml
+.idea/shelf/
+.omc/
+
+# 구글 OAuth 클라이언트 시크릿 — 절대 커밋 금지
+client_secret*.json
