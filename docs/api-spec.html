@@ -1,0 +1,817 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>아지트 API 명세</title>
+<style>
+:root {
+  --bg: #ffffff; --bg2: #f7f7f5; --bg3: #efefed; --hover: rgba(55,53,47,.06);
+  --tx: #37352f; --mu: #787774; --faint: #a5a29d; --line: #e9e9e7; --line2: #dcdcd9;
+  --code-bg: #f7f6f3; --code-tx: #eb5757; --accent: #2383e2; --shadow: 0 0 0 1px rgba(15,15,15,.05), 0 3px 6px rgba(15,15,15,.1), 0 9px 24px rgba(15,15,15,.2);
+  --t-gray-bg: #e3e2e0; --t-gray: #32302c;
+  --t-brown-bg: #eee0da; --t-brown: #442a1e;
+  --t-orange-bg: #fadec9; --t-orange: #49290e;
+  --t-yellow-bg: #fdecc8; --t-yellow: #402c1b;
+  --t-green-bg: #dbeddb; --t-green: #1c3829;
+  --t-blue-bg: #d3e5ef; --t-blue: #183347;
+  --t-purple-bg: #e8deee; --t-purple: #412454;
+  --t-pink-bg: #f5e0e9; --t-pink: #4c2337;
+  --t-red-bg: #ffe2dd; --t-red: #5d1715;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #191919; --bg2: #202020; --bg3: #2a2a2a; --hover: rgba(255,255,255,.055);
+    --tx: #d4d4d4; --mu: #9b9b9b; --faint: #6f6f6f; --line: #2f2f2f; --line2: #3a3a3a;
+    --code-bg: #2a2a2a; --code-tx: #ff7369; --accent: #529cca; --shadow: 0 0 0 1px rgba(255,255,255,.08), 0 9px 24px rgba(0,0,0,.6);
+    --t-gray-bg: #373737; --t-gray: #d4d4d4;
+    --t-brown-bg: #4a3328; --t-brown: #e6cdbf;
+    --t-orange-bg: #5c3b23; --t-orange: #f5d1b3;
+    --t-yellow-bg: #564328; --t-yellow: #f3e1b8;
+    --t-green-bg: #243d30; --t-green: #c3e2cc;
+    --t-blue-bg: #143a4e; --t-blue: #bfe0f3;
+    --t-purple-bg: #3c2d49; --t-purple: #dfcdee;
+    --t-pink-bg: #4e2c3c; --t-pink: #f1cadb;
+    --t-red-bg: #522e2a; --t-red: #f6c9c3;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--tx);
+  font: 14px/1.5 ui-sans-serif, -apple-system, "Segoe UI", "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+code, .mono { font-family: "SFMono-Regular", Menlo, Consolas, "D2Coding", monospace; font-size: .86em; }
+:not(pre) > code { background: var(--code-bg); color: var(--code-tx); padding: .15em .35em; border-radius: 4px; }
+a { color: inherit; }
+
+/* 페이지 머리 */
+.page { max-width: 1180px; margin: 0 auto; padding: 56px 48px 120px; }
+.cover-icon { font-size: 64px; line-height: 1; margin-bottom: 8px; }
+h1.title { font-size: 40px; font-weight: 700; margin: 0 0 6px; letter-spacing: -.01em; }
+.lead { color: var(--mu); margin: 0 0 22px; max-width: 760px; }
+.props { display: grid; grid-template-columns: 160px 1fr; gap: 6px 12px; margin-bottom: 26px; font-size: 14px; }
+.props dt { color: var(--mu); display: flex; align-items: center; gap: 6px; }
+.props dd { margin: 0; }
+
+/* 뷰 탭 */
+.views { display: flex; align-items: center; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 8px; overflow-x: auto; }
+.view-tab { border: 0; background: none; padding: 8px 10px 9px; color: var(--mu); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; display: flex; gap: 6px; align-items: center; }
+.view-tab:hover { color: var(--tx); }
+.view-tab.on { color: var(--tx); border-bottom-color: var(--tx); font-weight: 500; }
+.view-tab .n { color: var(--faint); font-size: 12px; }
+
+/* 툴바 */
+.toolbar { display: flex; align-items: center; gap: 6px; padding: 6px 0 10px; flex-wrap: wrap; }
+.filter { border: 1px solid var(--line2); background: var(--bg); border-radius: 14px; padding: 2px 10px; font-size: 13px; cursor: pointer; color: var(--mu); }
+.filter.on { background: var(--t-blue-bg); color: var(--t-blue); border-color: transparent; }
+.search { margin-left: auto; display: flex; align-items: center; gap: 6px; border: 1px solid var(--line2); border-radius: 6px; padding: 3px 8px; min-width: 220px; }
+.search input { border: 0; outline: none; background: none; width: 100%; font-size: 13px; }
+.progress-wrap { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--mu); }
+.progress { width: 120px; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+.progress span { display: block; height: 100%; background: #4dab9a; }
+
+/* 데이터베이스 표 */
+.db-wrap { overflow-x: auto; border-top: 1px solid var(--line); }
+table.db { border-collapse: collapse; width: 100%; min-width: 980px; font-size: 14px; }
+.db th { text-align: left; font-weight: 400; color: var(--mu); font-size: 13px; padding: 7px 8px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); white-space: nowrap; }
+.db th:last-child, .db td:last-child { border-right: 0; }
+.db th .ic { opacity: .7; margin-right: 5px; }
+.db td { padding: 7px 8px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); vertical-align: top; }
+.db tbody tr { cursor: pointer; }
+.db tbody tr:hover { background: var(--hover); }
+.db .group-row td { background: var(--bg); cursor: default; padding: 18px 8px 6px; border-right: 0; font-weight: 600; }
+.db .group-row:hover { background: none; }
+.db .group-row .cnt { color: var(--faint); font-weight: 400; margin-left: 6px; }
+.name-cell { font-weight: 500; display: flex; gap: 8px; align-items: flex-start; }
+.name-cell .open { margin-left: auto; opacity: 0; font-size: 11px; border: 1px solid var(--line2); border-radius: 4px; padding: 0 5px; color: var(--mu); background: var(--bg); white-space: nowrap; }
+.db tr:hover .open { opacity: 1; }
+.path { font-family: "SFMono-Regular", Menlo, Consolas, monospace; font-size: 12.5px; white-space: nowrap; }
+.path .param { color: var(--accent); }
+
+/* 태그 (노션 select 색) */
+.tag { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: 3px; font-size: 12px; white-space: nowrap; margin: 1px 4px 1px 0; line-height: 1; }
+.c-gray { background: var(--t-gray-bg); color: var(--t-gray); }
+.c-brown { background: var(--t-brown-bg); color: var(--t-brown); }
+.c-orange { background: var(--t-orange-bg); color: var(--t-orange); }
+.c-yellow { background: var(--t-yellow-bg); color: var(--t-yellow); }
+.c-green { background: var(--t-green-bg); color: var(--t-green); }
+.c-blue { background: var(--t-blue-bg); color: var(--t-blue); }
+.c-purple { background: var(--t-purple-bg); color: var(--t-purple); }
+.c-pink { background: var(--t-pink-bg); color: var(--t-pink); }
+.c-red { background: var(--t-red-bg); color: var(--t-red); }
+.method { font-family: "SFMono-Regular", Menlo, Consolas, monospace; font-weight: 600; font-size: 11px; }
+.status-btn { border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; border-radius: 10px; padding: 0 8px; height: 20px; font-size: 12px; }
+.status-btn::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .7; }
+
+/* 옆 패널 (노션 peek) */
+.scrim { position: fixed; inset: 0; background: rgba(15,15,15,.2); opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 10; }
+.scrim.on { opacity: 1; pointer-events: auto; }
+.peek { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 100%); background: var(--bg); box-shadow: var(--shadow); transform: translateX(102%); transition: transform .2s ease; z-index: 11; display: flex; flex-direction: column; }
+.peek.on { transform: none; }
+.peek-bar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--line); color: var(--mu); font-size: 13px; }
+.peek-bar button { border: 0; background: none; cursor: pointer; color: var(--mu); padding: 4px 6px; border-radius: 4px; }
+.peek-bar button:hover { background: var(--hover); color: var(--tx); }
+.peek-body { overflow-y: auto; padding: 36px 56px 80px; }
+.peek h2 { font-size: 30px; margin: 0 0 14px; font-weight: 700; }
+.peek h3 { font-size: 18px; margin: 30px 0 8px; font-weight: 600; }
+.peek h4 { font-size: 14px; margin: 18px 0 6px; font-weight: 600; color: var(--mu); }
+.peek p, .peek li { line-height: 1.65; }
+.peek ul { padding-left: 22px; margin: 6px 0; }
+.endpoint-line { display: flex; align-items: center; gap: 8px; background: var(--bg2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; margin: 6px 0 4px; }
+.endpoint-line .path { font-size: 14px; }
+pre { background: var(--code-bg); border-radius: 6px; padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.55; margin: 6px 0 10px; }
+pre .k { color: #c25e8d; } pre .s { color: #4d8a52; } pre .n { color: #d9730d; } pre .c { color: var(--faint); font-style: italic; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) pre .k { color: #e88fb6; } :root:not([data-theme="light"]) pre .s { color: #9ccf9f; } :root:not([data-theme="light"]) pre .n { color: #f0a868; } }
+table.mini { border-collapse: collapse; width: 100%; font-size: 13px; margin: 6px 0 10px; }
+table.mini th, table.mini td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+table.mini th { background: var(--bg2); font-weight: 500; color: var(--mu); }
+.callout { display: flex; gap: 10px; background: var(--bg2); border-radius: 6px; padding: 14px 16px; margin: 12px 0; }
+.callout .ic { font-size: 18px; line-height: 1.3; }
+.callout.go { background: var(--t-blue-bg); color: var(--t-blue); }
+.callout.warn { background: var(--t-yellow-bg); color: var(--t-yellow); }
+.callout code { background: rgba(255,255,255,.5); color: inherit; }
+
+/* 문서 페이지 (공통 규칙, 모델) */
+.doc { max-width: 860px; }
+.doc h2 { font-size: 24px; margin: 34px 0 10px; }
+.doc h3 { font-size: 17px; margin: 24px 0 8px; }
+.doc p, .doc li { line-height: 1.7; }
+.empty { color: var(--faint); padding: 30px 8px; }
+
+@media (max-width: 720px) {
+  .page { padding: 32px 16px 80px; }
+  .props { grid-template-columns: 110px 1fr; }
+  .peek-body { padding: 24px 18px 60px; }
+  .search { min-width: 0; flex: 1; margin-left: 0; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="cover-icon">🏠</div>
+  <h1 class="title">아지트 API 명세</h1>
+  <p class="lead">데스크톱 앱(Go · Wails)의 <code>internal/client</code>가 부르는 서버 API 전부. 행을 누르면 요청·응답·에러·구현 메모가 옆에 열려요. 상태 칸을 누르면 <b>구현 전 → 진행 중 → 완료</b>로 바뀌고, 이 브라우저에 저장돼요.</p>
+  <dl class="props">
+    <dt>📌 기준</dt><dd>프로젝트 개요(2026-10-07) · 프론트 화면 53개 · 프로토콜 버전 <code>1</code></dd>
+    <dt>🌐 기본 주소</dt><dd><code>https://{서버}/v1</code> · 개발 <code>http://127.0.0.1:8080/v1</code></dd>
+    <dt>🔑 인증</dt><dd><code>Authorization: Bearer {세션 토큰}</code> (불투명 토큰, JWT 아님)</dd>
+    <dt>📦 형식</dt><dd>JSON · 필드 이름 snake_case · 시간은 RFC 3339 UTC 문자열</dd>
+    <dt>⚡ 실시간</dt><dd>WebSocket <code>GET /v1/ws</code> — 서버 → 앱 한 방향 알림. 보내기는 전부 HTTP</dd>
+  </dl>
+
+  <nav class="views" id="views"></nav>
+  <div id="content"></div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="peek" id="peek" aria-hidden="true">
+  <div class="peek-bar">
+    <button id="peek-close" title="닫기 (Esc)">✕</button>
+    <button id="peek-prev" title="이전">↑</button>
+    <button id="peek-next" title="다음">↓</button>
+    <span id="peek-crumb"></span>
+  </div>
+  <div class="peek-body" id="peek-body"></div>
+</aside>
+
+<script>
+/* =====================================================================
+ * 데이터
+ * ===================================================================== */
+
+const DOMAINS = {
+  '기본':    'gray',
+  '인증':    'purple',
+  '아지트':  'green',
+  '초대 코드': 'yellow',
+  '멤버':    'blue',
+  '방':      'orange',
+  '메시지':  'pink',
+  '흔들기':  'red',
+  '사진·짤': 'brown',
+  '알림':    'blue',
+  '변경 기록': 'gray',
+  '돌림판·투표': 'green',
+  '라이어게임': 'red',
+  '실시간':  'purple',
+};
+const MVP_COLOR = { 'MVP 1': 'green', 'MVP 2': 'blue', 'MVP 3': 'pink' };
+const METHOD_COLOR = { GET: 'blue', POST: 'green', PATCH: 'yellow', PUT: 'orange', DELETE: 'red', WS: 'purple' };
+const STATUS = [['todo', '구현 전', 'gray'], ['doing', '진행 중', 'blue'], ['done', '완료', 'green']];
+
+// 자주 나오는 응답 조각
+const MEMBER = { account_id: 2, nick: '강백호', color: '#7BC4FF', title: '포커페이스', online: true, dnd: false, via_code: 'MK7Q2X', joined_at: '2026-09-20T11:02:00Z' };
+const ROOM = { id: 3, azit_id: 1, name: '게임방', landing: false, archived: false, last_seq: 128, read_seq: 124, unread: 4, last_message: { seq: 128, kind: 'text', author_id: 2, preview: '라이어 할 사람', created_at: '2026-10-07T05:20:00Z' }, live_game: { id: 9, status: 'lobby' } };
+const MSG = { id: 812, room_id: 3, seq: 128, client_id: '0f8c1a2e-5b8d-4c1e-9a77-3b2f0d1c9e44', kind: 'text', author_id: 1, body: '@강백호 점심 내기 누가 쏨', mentions: [{ account_id: 2, shook: true }], reactions: [], deleted: false, created_at: '2026-10-07T05:10:00Z' };
+
+/* 엔드포인트 하나 = 노션 데이터베이스 행 하나
+ * f: { id, name, method, path, domain, mvp, auth, screens, desc, params, query, body, res, status, errors, notes, go } */
+const E = [
+/* ---------------- 기본 ---------------- */
+{ id: 'healthz', name: '서버 살아 있나', method: 'GET', path: '/healthz', domain: '기본', mvp: 'MVP 1', auth: '없음',
+  screens: '—', desc: '로드밸런서·모니터링용. 1단계 과제. /v1 밖에 있어요.',
+  res: { ok: true, protocol: 1 }, status: '200',
+  go: ['<code>proto.ProtocolVersion</code>을 import 해서 넣어요 — go.work 가 모듈을 잇는 걸 확인하는 과제.', '<code>httptest.NewRecorder</code>로 테스트.'] },
+
+/* ---------------- 인증 ---------------- */
+{ id: 'auth-google', name: '구글로 로그인', method: 'POST', path: '/v1/auth/google', domain: '인증', mvp: 'MVP 1', auth: '없음',
+  screens: 'login, login-wait, login-error',
+  desc: '앱이 기본 브라우저로 구글 로그인을 띄우고 127.0.0.1 콜백으로 받은 <code>code</code>를 넘겨요. 서버가 구글과 교환해 <code>id_token</code>을 검증하고 <code>sub</code>로 계정을 찾아요. 이미 계정이 있으면 세션을 주고, 처음이면 가입 티켓을 줘요(초대 코드 필수).',
+  body: { code: '4/0AfJohXn...', code_verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk', redirect_uri: 'http://127.0.0.1:53682/callback', device: 'Windows · 아지트 0.1.0' },
+  res: { result: 'session', token: 'az_s_Vx9...(32바이트 base64url)', expires_at: '2026-11-06T05:00:00Z', account: { id: 1, name: '정문경', email: 'wjdans@gmail.com', dnd: false } },
+  status: '200',
+  extra: [['처음 가입하는 사람이면 (200)', { result: 'signup_required', signup_ticket: 'az_t_q8L...', ticket_expires_at: '2026-10-07T05:15:00Z', google_name: '정문경' }]],
+  errors: [['google_exchange_failed', 400, '구글 로그인을 확인하지 못했어요. 다시 해 주세요'], ['account_disabled', 403, '멈춘 계정이에요. 아지트 친구에게 물어봐 주세요']],
+  notes: ['PKCE: 앱이 <code>code_verifier</code>를 만들고 <code>code_challenge</code>로 구글 URL을 열어요. 서버는 교환할 때 verifier 를 같이 보내요.', '이메일은 기준이 아니에요. <code>accounts.google_sub</code>로만 찾아요.', '가입 티켓은 15분짜리. 그 안에 초대 코드를 넣어야 해요.'],
+  go: ['토큰은 <code>crypto/rand</code> 32바이트 → base64url. DB 에는 <code>sha256(token)</code>만 저장.', '구글 토큰 교환은 <code>net/http</code> POST <code>https://oauth2.googleapis.com/token</code> — 외부 HTTP 호출에 <code>context.WithTimeout</code>을 붙여 보세요.', 'client_secret 은 환경 변수로. 레포에 절대 커밋 금지.'] },
+
+{ id: 'auth-signup', name: '초대 코드로 가입 완료', method: 'POST', path: '/v1/auth/signup', domain: '인증', mvp: 'MVP 1', auth: '가입 티켓',
+  screens: 'join-nick (첫 가입)',
+  desc: '가입 티켓 + 초대 코드 + 닉네임으로 계정을 만들고, 그 아지트에 넣고, 세션을 줘요. 한 트랜잭션.',
+  body: { signup_ticket: 'az_t_q8L...', invite_code: 'MK7Q2X', nick: '문경', color: '#7BC4FF' },
+  res: { token: 'az_s_Vx9...', expires_at: '2026-11-06T05:00:00Z', account: { id: 14, name: '정문경', email: 'wjdans@gmail.com', dnd: false }, azit_id: 1, landing_room_id: 1 },
+  status: '201',
+  errors: [['signup_ticket_invalid', 401, '로그인이 오래돼서 끊겼어요. 구글로 다시 들어와 주세요'], ['invite_*', '—', '초대 코드 오류 6종 — 공통 규칙 참고'], ['nick_taken', 409, '이 아지트에 같은 닉네임이 있어요'], ['validation_failed', 400, 'nick 1~12자, color 는 정해진 6색 중 하나']],
+  go: ['계정 생성 · 멤버 추가 · 코드 uses+1 · 입장 sys 메시지 · 세션 발급을 <code>tx</code> 하나로. 하나라도 실패하면 Rollback.', '<code>uses &lt; max_uses</code> 검사는 UPDATE 조건에 넣어야 동시에 두 명이 마지막 자리를 못 가져가요: <code>UPDATE invite_codes SET uses = uses + 1 WHERE code = ? AND (max_uses = 0 OR uses &lt; max_uses)</code> → RowsAffected 확인.'] },
+
+{ id: 'auth-logout', name: '로그아웃', method: 'POST', path: '/v1/auth/logout', domain: '인증', mvp: 'MVP 1', auth: '세션',
+  screens: 'me', desc: '지금 세션만 지워요. WebSocket 도 서버가 끊어요.', status: '204' },
+
+{ id: 'me-get', name: '내 계정', method: 'GET', path: '/v1/me', domain: '인증', mvp: 'MVP 1', auth: '세션',
+  screens: '앱 시작', desc: '앱을 켤 때 저장된 토큰이 살아 있는지 확인용. 401 이면 로그인 화면으로.',
+  res: { id: 1, name: '정문경', email: 'wjdans@gmail.com', dnd: false, created_at: '2026-09-17T10:00:00Z' }, status: '200',
+  errors: [['unauthorized', 401, '(화면 문구 없음 — 로그인 화면으로 이동)']] },
+
+{ id: 'me-patch', name: '방해 금지 켜기/끄기', method: 'PATCH', path: '/v1/me', domain: '인증', mvp: 'MVP 2', auth: '세션',
+  screens: 'me', desc: '방해 금지면 흔들려도 창이 안 흔들리고 알림만 쌓여요. 바뀌면 같은 아지트 사람들에게 presence 이벤트.',
+  body: { dnd: true }, res: { id: 1, name: '정문경', email: 'wjdans@gmail.com', dnd: true }, status: '200' },
+
+/* ---------------- 아지트 ---------------- */
+{ id: 'azits-list', name: '내 아지트 목록', method: 'GET', path: '/v1/azits', domain: '아지트', mvp: 'MVP 1', auth: '세션',
+  screens: '왼쪽 레일', desc: '레일 네모들. 들어온 순서대로. <code>unread</code>는 모든 방 안 읽은 수 합.',
+  res: { azits: [{ id: 1, name: '의성읍시회축구단이낚시하다낚은강아지를키워봅세', short: '의성', color: '#D4FF3A', desc: '낚시하다 강아지 낚은 사람들의 모임', member_count: 14, unread: 0, landing_room_id: 1, me: { nick: '4n5rud', color: '#D4FF3A', title: '눈치 백단' } }] },
+  status: '200' },
+
+{ id: 'azits-create', name: '아지트 만들기', method: 'POST', path: '/v1/azits', domain: '아지트', mvp: 'MVP 1', auth: '세션',
+  screens: 'create, created',
+  desc: '"다같이" 방은 항상 만들고 <code>preset_rooms</code>를 더해요. 만든 사람은 멤버가 되고, 7일·무제한 초대 코드를 하나 발급해요.',
+  body: { name: '동네 친구들', color: '#FF5FA8', preset_rooms: ['짤방', '게임방'], nick: '4n5rud' },
+  res: { azit: { id: 3, name: '동네 친구들', short: '동네', color: '#FF5FA8', desc: '', member_count: 1, landing_room_id: 7 }, invite: { code: 'H3BR9T', expires_at: '2026-10-14T05:00:00Z', max_uses: 0 } },
+  status: '201',
+  errors: [['validation_failed', 400, '이름을 넣어 주세요 / 이름은 30자까지예요']],
+  notes: ['<code>short</code>는 이름 앞 2글자로 자동. 설정에서 바꿔요.', 'preset 은 <code>짤방, 게임방, 공지, 약속 잡기</code> 중에서만.'] },
+
+{ id: 'azit-get', name: '아지트 자세히', method: 'GET', path: '/v1/azits/{azit_id}', domain: '아지트', mvp: 'MVP 1', auth: '세션',
+  screens: '방 목록 머리, 방 정보, @ 후보, 설정', desc: '멤버 전체를 같이 줘요 (최대 50명이라 페이지 없음). 멤버가 아니면 404.',
+  res: { id: 1, name: '의성읍...', short: '의성', color: '#D4FF3A', desc: '낚시하다 강아지 낚은 사람들의 모임', landing_room_id: 1, welcome: true, name_changed_by: 3, name_changed_at: '2026-10-06T12:00:00Z', members: [MEMBER] },
+  status: '200', errors: [['not_found', 404, '(멤버가 아니어도 404 — 아지트가 있는지조차 숨김)']] },
+
+{ id: 'azit-patch', name: '아지트 기본 정보 바꾸기', method: 'PATCH', path: '/v1/azits/{azit_id}', domain: '아지트', mvp: 'MVP 2', auth: '세션',
+  screens: 'set-general', desc: '보낸 필드만 바꿔요. 바뀐 필드마다 변경 기록이 남고 되돌릴 수 있어요. 모두 주인이라 멤버 누구나.',
+  body: { name: '의성 낚시회', short: '의성', color: '#D4FF3A', desc: '…', landing_room_id: 1, welcome: true },
+  res: '아지트 자세히와 같음', status: '200',
+  errors: [['name_cooldown', 429, '이름은 10분에 한 번 바꿀 수 있어요 · {n}분 뒤에'], ['validation_failed', 400, '이름은 30자까지 / 짧은 이름은 3자까지 / 소개는 40자까지'], ['room_not_found', 400, '(landing_room_id 가 이 아지트 방이 아님)']],
+  go: ['PATCH 는 "안 보낸 필드"와 "빈 값"을 구분해야 해요. 구조체 필드를 포인터(<code>*string</code>)로 두면 nil = 안 보냄.'] },
+
+{ id: 'azit-leave', name: '아지트 나가기', method: 'POST', path: '/v1/azits/{azit_id}/leave', domain: '아지트', mvp: 'MVP 2', auth: '세션',
+  screens: 'set-leave', desc: '아지트·방은 그대로. 내 메시지는 남기거나 전부 지워요. 내가 만든 살아 있는 코드는 자동 폐기.',
+  body: { wipe_messages: false }, status: '204',
+  notes: ['남기기: 내 메시지 작성자가 화면에 "나간 멤버"로 보여요 (azit_members 에서 빠지니까).', '마지막 한 명이 나가도 아지트는 안 지워요.'] },
+
+/* ---------------- 초대 코드 ---------------- */
+{ id: 'invite-preview', name: '초대 코드 미리보기', method: 'GET', path: '/v1/invites/{code}', domain: '초대 코드', mvp: 'MVP 1', auth: '세션 또는 가입 티켓',
+  screens: 'join-code, join-code-error, join-preview',
+  desc: '코드를 확인하고 들어가기 전에 아지트를 보여줘요. 대소문자 상관없이 받아서 대문자로 바꿔 찾아요.',
+  res: { code: 'MK7Q2X', created_by_nick: '강백호', expires_at: '2026-10-13T05:00:00Z', azit: { id: 1, name: '의성읍...', short: '의성', color: '#D4FF3A', desc: '낚시하다 강아지 낚은 사람들의 모임', member_count: 14, rooms: ['다같이', '게임방', '짤방', '마크 원정대', '건축 자랑'] } },
+  status: '200',
+  extra: [['이미 들어와 있는 아지트면 (200)', { already_member: true, azit_id: 1, landing_room_id: 1 }]],
+  errors: [['invite_not_found', 404, '없는 코드예요. 대소문자 상관없이 6자리 그대로 넣어 주세요'], ['invite_revoked', 410, '폐기된 코드예요. 친구에게 새 코드를 받아 주세요'], ['invite_expired', 410, '유효 시간이 끝난 코드예요. 친구에게 새 코드를 받아 주세요'], ['invite_used_up', 410, '사용 횟수를 다 쓴 코드예요. 친구에게 새 코드를 받아 주세요'], ['azit_banned', 403, '이 아지트에는 들어갈 수 없어요'], ['azit_full', 409, '자리가 꽉 찼어요 (50명). 안에 있는 친구에게 말해 주세요'], ['too_many_attempts', 429, '5번 틀려서 잠깐 쉬어야 해요 · {n}초 뒤에']],
+  notes: ['틀린 시도는 계정(또는 티켓)당 1분에 5번까지. 코드 맞히기 공격 방지.'],
+  go: ['6종을 <code>var ErrInviteRevoked = errors.New(...)</code> 같은 sentinel 에러로 만들고, 핸들러에서 <code>errors.Is</code>로 HTTP 상태를 고르는 연습 (로드맵 4단계).'] },
+
+{ id: 'invite-join', name: '초대 코드로 들어가기', method: 'POST', path: '/v1/invites/{code}/join', domain: '초대 코드', mvp: 'MVP 1', auth: '세션',
+  screens: 'join-nick (이미 계정 있음)', desc: '이미 계정이 있는 사람이 새 아지트에 들어갈 때. 처음 가입은 <code>/auth/signup</code>.',
+  body: { nick: '문경', color: '#7BC4FF' }, res: { azit_id: 1, landing_room_id: 1 }, status: '201',
+  errors: [['invite_*', '—', '미리보기와 같은 6종'], ['nick_taken', 409, '이 아지트에 같은 닉네임이 있어요'], ['already_member', 409, '이미 들어와 있는 아지트예요']],
+  notes: ['입장 sys 메시지를 <b>처음 방</b>에 남기고, <code>welcome</code>이 켜져 있으면 멤버들에게 join 알림.'] },
+
+{ id: 'invites-list', name: '초대 코드 목록', method: 'GET', path: '/v1/azits/{azit_id}/invites', domain: '초대 코드', mvp: 'MVP 1', auth: '세션',
+  screens: 'set-codes', desc: '최근 만든 순. 죽은 코드(폐기·만료·다 씀)도 30일까지 보여요.',
+  res: { invites: [{ code: 'MK7Q2X', created_by: 1, created_by_nick: '4n5rud', state: 'live', expires_at: '2026-10-13T05:00:00Z', max_uses: 0, uses: 3, joined: ['김환성', '강백호', '추승주'] }] },
+  status: '200', notes: ['<code>state</code>는 저장하지 않고 읽을 때 계산: revoked → 폐기, expires_at 지남 → 만료, uses ≥ max_uses → 다 씀, 나머지 live.'] },
+
+{ id: 'invites-create', name: '초대 코드 만들기', method: 'POST', path: '/v1/azits/{azit_id}/invites', domain: '초대 코드', mvp: 'MVP 1', auth: '세션',
+  screens: 'set-codes, 방 목록 [초대 코드]', desc: '6자리 대문자+숫자. 헷갈리는 글자(0/O, 1/I)는 빼고 만들어요.',
+  body: { ttl_hours: 24, max_uses: 5 }, res: { code: 'Q9WE2R', expires_at: '2026-10-08T05:00:00Z', max_uses: 5, uses: 0, state: 'live' }, status: '201',
+  errors: [['validation_failed', 400, 'ttl_hours 는 1, 24, 168 / max_uses 는 0(제한 없음), 1, 5']],
+  go: ['겹치면 다시 뽑기: <code>UNIQUE(code)</code> 위반 에러를 잡아 최대 5번 재시도.'] },
+
+{ id: 'invites-revoke', name: '초대 코드 폐기', method: 'POST', path: '/v1/azits/{azit_id}/invites/{code}/revoke', domain: '초대 코드', mvp: 'MVP 1', auth: '세션',
+  screens: 'set-codes', desc: '되돌릴 수 없어요. 이미 들어온 멤버는 그대로. 변경 기록 "코드"에 남아요.', status: '204',
+  errors: [['not_found', 404, '(이 아지트 코드가 아님)']] },
+
+/* ---------------- 멤버 ---------------- */
+{ id: 'member-me-patch', name: '내 닉네임·색·칭호 바꾸기', method: 'PATCH', path: '/v1/azits/{azit_id}/members/me', domain: '멤버', mvp: 'MVP 2', auth: '세션',
+  screens: 'me', desc: '아지트마다 다른 닉네임. 칭호는 얻은 것만 장착 가능, <code>""</code>이면 빼기. 바뀌면 <code>member.updated</code> 이벤트.',
+  body: { nick: '문경', color: '#7BC4FF', title: '눈치 백단' }, res: MEMBER, status: '200',
+  errors: [['nick_taken', 409, '이 아지트에 같은 닉네임이 있어요'], ['title_locked', 400, '(아직 못 얻은 칭호)'], ['validation_failed', 400, '닉네임을 넣어 주세요 / 닉네임은 12자까지예요']] },
+
+{ id: 'member-get', name: '멤버 프로필', method: 'GET', path: '/v1/azits/{azit_id}/members/{account_id}', domain: '멤버', mvp: 'MVP 2', auth: '세션',
+  screens: 'modal-member, modal-member-me', desc: '프로필 모달. 전적 숫자는 라이어게임(MVP 3) 전엔 전부 0.',
+  res: Object.assign({}, MEMBER, { stats: { games: 4, catches: 1, liar_survive: 0, liar_games: 1, snipes: 0, citizen_wins: 2, shakes: 5 }, title_count: 2 }), status: '200',
+  errors: [['member_not_found', 404, '나간 멤버예요']] },
+
+{ id: 'member-kick', name: '멤버 내보내기', method: 'POST', path: '/v1/azits/{azit_id}/members/{account_id}/kick', domain: '멤버', mvp: 'MVP 2', auth: '세션',
+  screens: 'modal-kick, set-members', desc: '모두 주인이라 누구나. 변경 기록에 남고 누구나 되돌릴 수 있어요. <code>ban</code>이면 새 코드로도 못 들어와요.',
+  body: { ban: false }, status: '204',
+  errors: [['cannot_kick_self', 400, '(나 자신은 "나가기"로)'], ['member_not_found', 404, '나간 멤버예요']],
+  notes: ['내보내진 사람의 열린 WebSocket 에 <code>azit.removed</code>를 보내고 그 아지트 구독을 끊어요.'] },
+
+{ id: 'bans-list', name: '막은 사람 목록', method: 'GET', path: '/v1/azits/{azit_id}/bans', domain: '멤버', mvp: 'MVP 2', auth: '세션',
+  screens: 'set-members', desc: '', res: { bans: [{ account_id: 9, name: '권재현', banned_by_nick: '강백호', banned_at: '2026-10-01T00:00:00Z' }] }, status: '200' },
+
+{ id: 'bans-delete', name: '막은 것 풀기', method: 'DELETE', path: '/v1/azits/{azit_id}/bans/{account_id}', domain: '멤버', mvp: 'MVP 2', auth: '세션',
+  screens: 'set-members', desc: '풀어도 자동으로 다시 들어오진 않아요. 새 코드가 필요해요.', status: '204' },
+
+/* ---------------- 방 ---------------- */
+{ id: 'rooms-list', name: '방 목록', method: 'GET', path: '/v1/azits/{azit_id}/rooms', domain: '방', mvp: 'MVP 1', auth: '세션',
+  screens: '방 목록, mini-rooms, set-rooms', desc: '최근 메시지 순. <code>last_seq</code>와 <code>read_seq</code>의 차이가 안 읽은 수, 그리고 재접속 때 빠진 메시지 판단 기준.',
+  query: [['archived', 'bool', 'true 면 보관함 방만 (설정 화면용)']],
+  res: { rooms: [ROOM] }, status: '200',
+  notes: ['미리보기 글자는 서버가 안 만들어요. <code>last_message</code> 구조로 주면 앱이 "강백호: 라이어 할 사람"으로 그려요 (닉네임이 바뀌어도 맞게).'] },
+
+{ id: 'rooms-create', name: '방 만들기', method: 'POST', path: '/v1/azits/{azit_id}/rooms', domain: '방', mvp: 'MVP 1', auth: '세션',
+  screens: 'modal-newroom, modal-newroom-error', desc: '아지트 멤버는 모든 방에 자동으로 있어요. 지울 수 없고 보관만.',
+  body: { name: '시험 끝나고' }, res: Object.assign({}, ROOM, { id: 8, name: '시험 끝나고', last_seq: 1, read_seq: 1, unread: 0, live_game: null }), status: '201',
+  errors: [['validation_failed', 400, '방 이름을 넣어 주세요 / 방 이름은 20자까지예요'], ['room_name_taken', 409, '같은 이름의 방이 이미 있어요'], ['room_limit', 409, '방은 20개까지예요. 안 쓰는 방을 보관해 주세요']],
+  notes: ['"방 만듦" sys 메시지가 seq 1 이에요.'] },
+
+{ id: 'room-patch', name: '방 이름 바꾸기 · 보관 · 꺼내기', method: 'PATCH', path: '/v1/rooms/{room_id}', domain: '방', mvp: 'MVP 2', auth: '세션',
+  screens: 'set-rooms, set-rooms-landing', desc: '보관하면 목록에서 숨고 메시지는 그대로. 누구나 꺼낼 수 있어요.',
+  body: { name: '건축 자랑방', archived: false }, res: '방 목록의 한 항목', status: '200',
+  errors: [['room_name_taken', 409, '같은 이름의 방이 있어요 (꺼낼 때도)'], ['landing_cannot_archive', 409, '새 멤버가 처음 들어오는 방이라 보관할 수 없어요'], ['game_in_progress', 409, '진행 중인 판이 끝나야 보관할 수 있어요']] },
+
+{ id: 'room-read', name: '여기까지 읽음', method: 'POST', path: '/v1/rooms/{room_id}/read', domain: '방', mvp: 'MVP 1', auth: '세션',
+  screens: '채팅 화면 열기·스크롤', desc: '읽은 위치는 앞으로만 가요 (더 작은 seq 가 오면 무시). 내 다른 기기에도 <code>room.read</code> 이벤트.',
+  body: { seq: 128 }, status: '204',
+  go: ['<code>UPDATE room_reads SET seq = MAX(seq, ?)</code> — SQLite 의 스칼라 MAX 로 한 줄에.', 'MVP 1 테이블 목록엔 없지만 안 읽은 수를 위해 <code>room_reads(room_id, account_id, seq)</code>가 필요해요.'] },
+
+/* ---------------- 메시지 ---------------- */
+{ id: 'messages-list', name: '메시지 가져오기', method: 'GET', path: '/v1/rooms/{room_id}/messages', domain: '메시지', mvp: 'MVP 1', auth: '세션',
+  screens: 'chat (처음 열기, 위로 스크롤, 재접속)', desc: '두 방향. <code>after_seq</code> = 재접속 때 빠진 것 채우기, <code>before_seq</code> = 위로 스크롤해서 옛날 것.',
+  query: [['after_seq', 'int', '이 seq 보다 큰 것을 오래된 순으로'], ['before_seq', 'int', '이 seq 보다 작은 것을 최근 순으로 (둘 다 없으면 최신 limit 개)'], ['limit', 'int', '기본 50, 최대 200']],
+  res: { messages: [MSG], has_more: false }, status: '200',
+  notes: ['응답 배열은 <b>항상 seq 오름차순</b>으로 정렬해서 줘요 (before 로 가져와도).', '<code>has_more</code>가 true 면 같은 방향으로 한 번 더.'] },
+
+{ id: 'messages-send', name: '메시지 보내기', method: 'POST', path: '/v1/rooms/{room_id}/messages', domain: '메시지', mvp: 'MVP 1', auth: '세션',
+  screens: 'chat 입력창, chat-mention, chat-reconnect', desc: '<code>client_id</code>는 앱이 만든 UUID. 같은 client_id 로 다시 보내면 새로 만들지 않고 처음 것을 돌려줘요 → 끊겨서 재전송해도 중복 0. <code>mentions</code>에 들어간 사람은 흔들려요.',
+  body: { client_id: '0f8c1a2e-5b8d-4c1e-9a77-3b2f0d1c9e44', kind: 'text', body: '@강백호 점심 내기 누가 쏨', mentions: [2] },
+  res: MSG, status: '201 (재전송이면 200)',
+  extra: [['MVP 2 · 사진', { client_id: '…', kind: 'image', media_key: 'm_7Yp2...' }], ['MVP 2 · 짤', { client_id: '…', kind: 'sticker', sticker_id: 5 }]],
+  errors: [['validation_failed', 400, '빈 메시지 / 4000자 초과'], ['shake_rate_limited', 429, '흔들기는 1분에 3번까지예요 · {n}초 뒤에'], ['room_archived', 409, '보관된 방이에요. 꺼내야 보낼 수 있어요']],
+  notes: ['흔들기 제한에 걸리면 <b>메시지 전체를 거절</b>해요. 앱은 입력한 글을 지우지 않아요 (에러 문구 원칙).', '멘션 대상이 방해 금지면 창은 안 흔들리고 알림만.'],
+  go: ['seq 는 트랜잭션 안에서: <code>UPDATE rooms SET last_seq = last_seq + 1 WHERE id = ? RETURNING last_seq</code> → 그 값으로 INSERT. 방마다 1, 2, 3 … 빈칸 없이.', '<code>UNIQUE(room_id, seq)</code>, <code>UNIQUE(author_id, client_id)</code>. 두 번째 UNIQUE 위반이 나면 기존 메시지를 SELECT 해서 200.', '커밋이 끝난 <b>다음에</b> hub 에 넘겨 배달 (커밋 전에 보내면 롤백됐는데 화면엔 뜨는 사고).'] },
+
+{ id: 'messages-delete', name: '내 메시지 지우기', method: 'DELETE', path: '/v1/rooms/{room_id}/messages/{message_id}', domain: '메시지', mvp: 'MVP 2', auth: '세션',
+  screens: 'modal-delete', desc: '내 것만. 행은 남기고 <code>deleted=true</code>, 본문은 비워요 → 모두의 화면에서 "지운 메시지". 되돌릴 수 없어요.', status: '204',
+  errors: [['forbidden', 403, '(남의 메시지)'], ['not_found', 404, '']],
+  notes: ['seq 는 그대로라 순서가 안 깨져요. <code>message.deleted</code> 이벤트.'] },
+
+{ id: 'reactions-put', name: '맞장구 달기', method: 'PUT', path: '/v1/messages/{message_id}/reactions/{react_id}', domain: '메시지', mvp: 'MVP 2', auth: '세션',
+  screens: 'chat 메시지 hover 메뉴', desc: '같은 걸 두 번 PUT 해도 한 번 (멱등). 끄기는 DELETE.', status: '204',
+  notes: ['바뀌면 <code>reaction.updated</code>로 그 메시지의 맞장구 전체 개수를 보내요 (증감 말고 최종값 → 순서 꼬여도 안전).'] },
+
+{ id: 'reactions-delete', name: '맞장구 빼기', method: 'DELETE', path: '/v1/messages/{message_id}/reactions/{react_id}', domain: '메시지', mvp: 'MVP 2', auth: '세션',
+  screens: 'chat', desc: '', status: '204' },
+
+/* ---------------- 흔들기 ---------------- */
+{ id: 'shake', name: '메시지 없이 흔들기', method: 'POST', path: '/v1/rooms/{room_id}/shake', domain: '흔들기', mvp: 'MVP 1', auth: '세션',
+  screens: 'modal-shake, sys 메시지의 되흔들기·환영 흔들기, modal-member', desc: '상대 창이 실제로 흔들려요. "강백호가 흔들었어요 · 4n5rud" sys 메시지가 그 방에 남아요.',
+  body: { to: 2 }, res: { delivered: 'shake', message: { id: 813, seq: 129, kind: 'sys', sys: { type: 'shake', actor_id: 1, target_id: 2 } } }, status: '201',
+  extra: [['상대가 방해 금지면', { delivered: 'notify_only', message: '…' }]],
+  errors: [['shake_rate_limited', 429, '흔들기는 1분에 3번까지예요 · {n}초 뒤에'], ['member_not_found', 404, '나간 멤버예요'], ['cannot_shake_self', 400, '']],
+  notes: ['제한은 <b>보내는 사람 기준</b> 1분 3회. @멘션 흔들기와 합산.'],
+  go: ['횟수 제한은 메모리로 충분: <code>map[accountID][]time.Time</code> + <code>sync.Mutex</code>. 로드맵 5단계의 첫 Mutex 실습.', '받는 사람에게는 <code>shake</code> 이벤트가 가고, 앱은 Go 쪽(bridge)에서 실제 창을 흔들어요.'] },
+
+/* ---------------- 사진·짤 ---------------- */
+{ id: 'media-upload', name: '사진 올리기', method: 'POST', path: '/v1/media', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
+  screens: 'chat + 사진, set-stickers + 짤 올리기', desc: '<code>multipart/form-data</code>의 <code>file</code> 하나. 받은 <code>media_key</code>로 메시지를 보내거나 짤로 저장해요. 24시간 안에 안 쓰면 지워요.',
+  body: '(multipart) file=@photo.jpg  purpose=message|sticker',
+  res: { media_key: 'm_7Yp2Qx...', width: 1280, height: 960, bytes: 482113 }, status: '201',
+  errors: [['file_too_large', 413, '{n}MB라 못 보내요 · 10MB까지 (짤은 5MB까지예요)'], ['unsupported_media', 415, '사진 파일만 보낼 수 있어요 / 사진을 읽지 못했어요. 다른 사진으로 해 주세요']],
+  go: ['<code>http.MaxBytesReader</code>로 크기 제한을 먼저 걸고 읽기.', '종류 판별은 확장자 말고 <code>http.DetectContentType</code>(앞 512바이트).', '줄이기: 긴 변 1600px(사진) / 512px(짤).'] },
+
+{ id: 'media-get', name: '사진 받기', method: 'GET', path: '/v1/media/{media_key}', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
+  screens: 'chat, modal-image', desc: '이미지 바이트. 그 사진이 올라간 아지트 멤버만. <code>Cache-Control: private, max-age=31536000, immutable</code> (키가 안 바뀌니까).', status: '200 (image/*)' },
+
+{ id: 'stickers-list', name: '짤 모음', method: 'GET', path: '/v1/azits/{azit_id}/stickers', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
+  screens: 'chat-sticker, set-stickers', desc: '',
+  res: { stickers: [{ id: 5, name: '킹받네', media_key: 'm_k1...', created_by_nick: '김환성', created_at: '2026-10-07T05:00:00Z', in_reacts: false }] }, status: '200' },
+
+{ id: 'stickers-create', name: '짤로 저장', method: 'POST', path: '/v1/azits/{azit_id}/stickers', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
+  screens: '메시지 "짤로 저장", set-stickers', desc: '새로 올린 사진(<code>media_key</code>) 또는 채팅의 사진·짤 메시지(<code>from_message_id</code>)에서.',
+  body: { media_key: 'm_7Yp2...', name: '킹받네' }, res: { id: 6, name: '킹받네', media_key: 'm_7Yp2...' }, status: '201',
+  extra: [['채팅 사진에서', { from_message_id: 815, name: '사진' }]],
+  errors: [['sticker_limit', 409, '짤은 60개까지예요. 안 쓰는 짤을 빼 주세요'], ['sticker_duplicate', 409, '이미 있는 짤이에요']],
+  go: ['중복 판별은 이미지 바이트의 sha256 을 <code>stickers.hash</code>에 UNIQUE(azit_id, hash).'] },
+
+{ id: 'stickers-patch', name: '짤 이름 바꾸기', method: 'PATCH', path: '/v1/azits/{azit_id}/stickers/{sticker_id}', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
+  screens: 'set-stickers', desc: '', body: { name: '현타' }, status: '200', errors: [['validation_failed', 400, '1~10자']] },
+
+{ id: 'stickers-delete', name: '짤 빼기', method: 'DELETE', path: '/v1/azits/{azit_id}/stickers/{sticker_id}', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
+  screens: 'set-stickers', desc: '변경 기록에서 되돌릴 수 있게 실제로는 숨김(soft delete). 맞장구에 있으면 거기서도 빠져요.', status: '204' },
+
+{ id: 'reacts-get', name: '맞장구 목록', method: 'GET', path: '/v1/azits/{azit_id}/reacts', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
+  screens: 'chat hover 메뉴, set-stickers', desc: '순서대로. 새 아지트 기본값은 <code>ㅋㅋ, 헐, 최고, 킹받네</code>.',
+  res: { reacts: [{ id: 1, text: 'ㅋㅋ' }, { id: 3, sticker_id: 1, name: '정색', media_key: 'm_...' }] }, status: '200' },
+
+{ id: 'reacts-put', name: '맞장구 통째로 바꾸기', method: 'PUT', path: '/v1/azits/{azit_id}/reacts', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
+  screens: 'set-stickers (순서·추가·빼기)', desc: '순서 바꾸기·넣기·빼기를 전부 "최종 목록 PUT" 하나로. 기존 항목은 id 를 같이 보내야 달린 맞장구가 안 사라져요.',
+  body: { items: [{ id: 1 }, { id: 3 }, { text: '레전드' }, { sticker_id: 4 }] }, res: '맞장구 목록과 같음', status: '200',
+  errors: [['react_limit', 409, '맞장구는 8개까지예요. 하나 빼고 넣어 주세요'], ['react_min', 409, '맞장구는 1개 이상 있어야 해요'], ['react_duplicate', 409, '이미 있는 맞장구예요 / 이미 맞장구에 있는 짤이에요'], ['validation_failed', 400, '글자는 4자까지']] },
+
+/* ---------------- 알림 ---------------- */
+{ id: 'notifs-list', name: '알림 목록', method: 'GET', path: '/v1/notifications', domain: '알림', mvp: 'MVP 2', auth: '세션',
+  screens: 'activity, activity-empty, 레일 종 배지', desc: '모든 아지트 것을 한곳에. 최근 순, 30일치.',
+  query: [['kind', 'string', 'shake | game | azit | title (azit = join + kick)'], ['before_id', 'int', '더 보기']],
+  res: { unread: 2, notifications: [{ id: 41, kind: 'shake', azit_id: 1, azit_short: '의성', read: false, created_at: '2026-10-07T05:10:00Z', data: { actor_nick: '김환성', room_id: 1, room_name: '다같이', message_id: 812 } }] }, status: '200',
+  notes: ['문구는 앱이 <code>kind + data</code>로 만들어요. 누르면 <code>data</code>로 그 방·메시지로 이동.'] },
+
+{ id: 'notifs-read', name: '알림 읽음', method: 'POST', path: '/v1/notifications/{id}/read', domain: '알림', mvp: 'MVP 2', auth: '세션',
+  screens: 'activity 항목 누르기', desc: '', status: '204' },
+
+{ id: 'notifs-read-all', name: '알림 모두 읽음', method: 'POST', path: '/v1/notifications/read-all', domain: '알림', mvp: 'MVP 2', auth: '세션',
+  screens: 'activity [모두 읽음]', desc: '', status: '204' },
+
+/* ---------------- 변경 기록 ---------------- */
+{ id: 'log-list', name: '변경 기록', method: 'GET', path: '/v1/azits/{azit_id}/log', domain: '변경 기록', mvp: 'MVP 2', auth: '세션',
+  screens: 'set-log', desc: '모두 주인이라 누가 뭘 바꿨는지 전부. 최근 순.',
+  query: [['type', 'string', '방 | 짤 | 맞장구 | 코드 | 멤버 | 설정 (영문: room, sticker, react, code, member, setting)'], ['before_id', 'int', '더 보기']],
+  res: { entries: [{ id: 77, type: 'room', by: 2, by_nick: '강백호', action: 'room.archive', target: { room_id: 9, name: '테스트ㅋㅋ' }, undoable: true, undone_by: null, created_at: '2026-10-07T04:50:00Z' }] }, status: '200' },
+
+{ id: 'log-undo', name: '되돌리기', method: 'POST', path: '/v1/azits/{azit_id}/log/{entry_id}/undo', domain: '변경 기록', mvp: 'MVP 2', auth: '세션',
+  screens: 'set-log, 토스트 [되돌리기]', desc: '<code>audit_log.undo_json</code>에 적어 둔 "반대 동작"을 실행하고, 되돌린 것도 새 기록으로 남겨요.', status: '200',
+  res: { entry_id: 77, undone_by: 1 },
+  errors: [['already_undone', 409, '이미 되돌린 기록이에요'], ['not_undoable', 409, '(코드 폐기 등 되돌릴 수 없는 기록)'], ['undo_conflict', 409, '그 뒤에 또 바뀌어서 되돌릴 수 없어요']],
+  go: ['undo_json 예: <code>{"op":"room.archive","room_id":9,"value":false}</code> → <code>switch op</code> 로 처리. 동작마다 인터페이스로 뽑아 보는 연습도 좋아요.'] },
+
+/* ---------------- 돌림판·투표 ---------------- */
+{ id: 'roulette-create', name: '돌림판 돌리기', method: 'POST', path: '/v1/rooms/{room_id}/roulettes', domain: '돌림판·투표', mvp: 'MVP 3', auth: '세션',
+  screens: 'modal-roulette', desc: '결과는 <b>서버가</b> 뽑아요 (앱이 뽑으면 조작 가능). 메시지 kind=roulette 로 남아요.',
+  body: { client_id: '…', title: '점심 쏘기', options: ['김환성', '강백호', '4n5rud'] },
+  res: { message: Object.assign({}, MSG, { kind: 'roulette', body: '', roulette: { title: '점심 쏘기', options: ['김환성', '강백호', '4n5rud'], result: '강백호', spins: 1 } }) }, status: '201',
+  errors: [['validation_failed', 400, '후보는 2~20개, 각 20자까지']],
+  go: ['<code>math/rand/v2</code>의 <code>rand.IntN</code>.'] },
+
+{ id: 'roulette-respin', name: '다시 돌리기', method: 'POST', path: '/v1/roulettes/{message_id}/respin', domain: '돌림판·투표', mvp: 'MVP 3', auth: '세션',
+  screens: 'chat 돌림판 카드', desc: '최대 3번. 같은 메시지를 고치고 <code>message.updated</code>.', status: '200',
+  errors: [['respin_limit', 409, '다시 돌리기 끝']] },
+
+{ id: 'poll-create', name: '투표 올리기', method: 'POST', path: '/v1/rooms/{room_id}/polls', domain: '돌림판·투표', mvp: 'MVP 3', auth: '세션',
+  screens: 'modal-poll', desc: '', body: { client_id: '…', question: '토요일 몇 시?', options: ['오후 2시', '오후 4시', '저녁'] },
+  res: { message: Object.assign({}, MSG, { kind: 'poll', body: '', poll: { question: '토요일 몇 시?', options: [{ label: '오후 2시', count: 0, me: false }], total: 0, closed: false } }) }, status: '201',
+  errors: [['validation_failed', 400, '질문과 보기 2개가 필요해요 (보기는 5개까지)']] },
+
+{ id: 'poll-vote', name: '투표하기', method: 'PUT', path: '/v1/polls/{message_id}/vote', domain: '돌림판·투표', mvp: 'MVP 3', auth: '세션',
+  screens: 'chat 투표 카드', desc: '한 사람 한 표, 다시 PUT 하면 바뀜.', body: { option: 0 }, status: '200',
+  errors: [['poll_closed', 409, '마감된 투표예요']] },
+
+{ id: 'poll-close', name: '투표 마감', method: 'POST', path: '/v1/polls/{message_id}/close', domain: '돌림판·투표', mvp: 'MVP 3', auth: '세션',
+  screens: 'chat 투표 카드 [마감하기]', desc: '올린 사람만.', status: '204', errors: [['forbidden', 403, '']] },
+
+/* ---------------- 라이어게임 ---------------- */
+{ id: 'playground', name: '놀이터', method: 'GET', path: '/v1/azits/{azit_id}/playground', domain: '라이어게임', mvp: 'MVP 3', auth: '세션',
+  screens: 'hub', desc: '놀이터 한 화면에 필요한 걸 한 번에.',
+  res: { open_games: [{ id: 9, room_id: 3, room_name: '게임방', status: 'lobby', players: 3, topic: 'food', joined: false }], recent: [{ id: 8, winner: 'citizen', room_name: '게임방', word: '떡볶이', liars: ['류승엽'], ended_at: '…' }], ranking: [{ account_id: 1, nick: '4n5rud', color: '#D4FF3A', wins: 5 }], my_stats: { games: 7, catches: 3, liar_survive: 1, liar_games: 2, snipes: 0, citizen_wins: 4, shakes: 12 } }, status: '200' },
+
+{ id: 'titles', name: '칭호 도감', method: 'GET', path: '/v1/azits/{azit_id}/members/me/titles', domain: '라이어게임', mvp: 'MVP 3', auth: '세션',
+  screens: 'me 도감', desc: '아지트 기준. 조건 숫자와 지금 값을 같이 줘서 앱이 진행 막대를 그려요.',
+  res: { titles: [{ name: '눈치 백단', rarity: 'rare', cond: '시민으로 라이어 3번 검거', unlocked: true, progress: [3, 3] }, { name: '제시어 저격수', rarity: 'legend', cond: '잡힌 뒤 제시어 맞히기', unlocked: false, progress: [0, 1] }] }, status: '200' },
+
+{ id: 'liar-open', name: '라이어 판 열기', method: 'POST', path: '/v1/rooms/{room_id}/liar', domain: '라이어게임', mvp: 'MVP 3', auth: '세션',
+  screens: 'modal-opengame, hub', desc: '방마다 판은 하나. 연 사람이 방장이고 자동 참가. 채팅에 kind=game 메시지가 올라가요.',
+  body: { topic: 'food', mode: 'normal', liars: 1, rounds: 2 }, res: { game_id: 9, message_id: 830 }, status: '201',
+  errors: [['game_in_progress', 409, '이 방엔 이미 판이 열려 있어요'], ['validation_failed', 400, 'topic: food|place|job|animal · mode: normal|fool · liars: 1|2 · rounds: 1~3']] },
+
+{ id: 'liar-get', name: '라이어 판 상태', method: 'GET', path: '/v1/liar/{game_id}', domain: '라이어게임', mvp: 'MVP 3', auth: '세션',
+  screens: 'liar-* 전부', desc: '<b>보는 사람마다 다른 응답</b>이에요. 내 제시어만 들어 있고, 남의 역할과 제시어는 끝날 때까지 없어요.',
+  res: { id: 9, room_id: 3, status: 'vote', host_id: 2, settings: { topic: 'food', mode: 'normal', liars: 1, rounds: 2 }, round: 2, turn_id: null, players: [{ account_id: 2, desc: ['빨간색임', '떡'], voted: true }], me: { player: true, role: 'citizen', word: '떡볶이', vote: 4 }, votes_cast: 3, accused_id: null, result: null }, status: '200',
+  notes: ['끝나면 <code>result</code>: <code>{ winner, liars:[id], word, liar_word, accused_id, snipe, tally:{id:표} }</code>.', '봇(연습봇)은 account_id 가 음수예요.'],
+  go: ['규칙은 HTTP 를 모르는 <code>internal/game/liar</code> 패키지에. <code>Apply(state, action) (state, []Event, error)</code> 꼴의 순수 함수로 만들면 봇만으로 한 판을 테스트할 수 있어요.', '"사람마다 다른 응답"은 <code>func (s *State) ViewFor(accountID int64) View</code> 하나로.'] },
+
+{ id: 'liar-action', name: '라이어 판 행동', method: 'POST', path: '/v1/liar/{game_id}/{action}', domain: '라이어게임', mvp: 'MVP 3', auth: '세션',
+  screens: 'liar-lobby ~ liar-done', desc: '행동마다 같은 모양. 성공하면 바뀐 내 시점 상태를 돌려주고, 다른 사람들에겐 <code>game.updated</code>.',
+  table: [['join', '{}', '대기 중에만. 8명까지'], ['leave', '{}', '대기 중에만. 방장이 나가면 판 취소'], ['bots', '{}', '방장만. 연습봇으로 4명 채우기'], ['start', '{}', '방장만. 3명 이상'], ['describe', '{"text":"빨간색임"}', '내 차례에만. 제시어를 그대로 쓰면 거절'], ['skip', '{}', '지금 차례 넘기기 (자리 비운 사람)'], ['vote', '{"target":4}', '투표 중. 다시 보내면 바뀜'], ['close-vote', '{}', '방장만. 투표 마감'], ['guess', '{"word":"떡볶이"}', '잡힌 라이어만. 역전 기회'], ['pass-guess', '{}', '방장만. 역전 기회 넘기기'], ['replay', '{}', '끝난 판에서 같은 설정으로 새 판']],
+  res: '라이어 판 상태와 같음', status: '200',
+  errors: [['not_your_turn', 409, '(차례 아님)'], ['host_only', 403, '(방장만)'], ['word_in_description', 400, '제시어를 그대로 말하면 안 돼요'], ['need_more_players', 409, '{n}명 더 필요'], ['game_full', 409, '(8명)'], ['wrong_phase', 409, '(지금 단계에서 못 하는 행동)']],
+  notes: ['설명 차례 제한 시간 40초, 투표 60초 — 지나면 서버가 자동으로 넘겨요.'],
+  go: ['시간 제한은 판마다 <code>time.AfterFunc</code> 또는 판 하나당 고루틴 + <code>select { case act := &lt;-actions: … case &lt;-timer.C: … }</code>. 로드맵 5단계 select 실습으로 딱 좋아요.'] },
+
+/* ---------------- 실시간 ---------------- */
+{ id: 'ws', name: '실시간 연결', method: 'WS', path: '/v1/ws', domain: '실시간', mvp: 'MVP 1', auth: '세션',
+  screens: '앱 켜져 있는 동안 항상', desc: '서버 → 앱 한 방향. 내가 속한 <b>모든 아지트</b>의 이벤트가 와요 (방 구독 개념 없음). 앱이 보내는 건 WebSocket 핑뿐이고, 행동은 전부 HTTP 로.',
+  body: '요청 헤더\nAuthorization: Bearer az_s_Vx9...\nX-Azit-Protocol: 1',
+  res: { type: 'hello', data: { protocol: 1, server_time: '2026-10-07T05:00:00Z', account_id: 1 } }, status: '101 Switching Protocols',
+  notes: ['모든 이벤트는 <code>{"type": "...", "data": {...}}</code> 봉투. 목록은 "실시간 이벤트" 탭.', '서버 핑 30초, 응답 없으면 끊음. 앱은 1초 → 2초 → 4초 … 최대 30초로 다시 연결.', '재접속 절차는 "공통 규칙" 탭의 <b>빠진 메시지 채우기</b>.'],
+  go: ['라이브러리: <code>github.com/coder/websocket</code> (표준 라이브러리엔 없어요).', '연결 하나 = 읽기 고루틴 + 쓰기 고루틴 + 보낼 것 담는 <code>chan []byte</code>(버퍼 있음). 버퍼가 차면 느린 클라이언트로 보고 끊어요 — 그래야 한 명 때문에 전체 배달이 안 막혀요.', '이게 <code>internal/hub</code>. 로드맵 5·6단계의 본진.'] },
+];
+
+/* 실시간 이벤트 (서버 → 앱) */
+const EVENTS = [
+  ['hello', 'MVP 1', '연결 직후 한 번', { protocol: 1, server_time: '…', account_id: 1 }],
+  ['message.created', 'MVP 1', '새 메시지 (sys 포함). 내가 보낸 것도 와요 → client_id 로 내 임시 메시지와 합쳐요', { room_id: 3, message: MSG }],
+  ['message.updated', 'MVP 3', '돌림판 다시 돌리기, 투표 수 변경', { room_id: 3, message: '…' }],
+  ['message.deleted', 'MVP 2', '지운 메시지', { room_id: 3, message_id: 812, seq: 128 }],
+  ['reaction.updated', 'MVP 2', '그 메시지 맞장구 최종 개수', { room_id: 3, message_id: 812, reactions: [{ react_id: 1, count: 3, me: true }] }],
+  ['shake', 'MVP 1', '<b>나를</b> 흔들었을 때만 (방해 금지면 안 옴). 앱이 창을 흔들어요', { azit_id: 1, room_id: 3, from: 2, from_nick: '강백호', message_id: 813 }],
+  ['room.created', 'MVP 1', '새 방', { azit_id: 1, room: ROOM }],
+  ['room.updated', 'MVP 2', '이름 바꿈·보관·꺼냄', { azit_id: 1, room: ROOM }],
+  ['room.read', 'MVP 1', '내 다른 기기에서 읽음', { room_id: 3, seq: 128 }],
+  ['azit.updated', 'MVP 2', '기본 정보 바뀜', { azit: '아지트 자세히(멤버 제외)' }],
+  ['azit.removed', 'MVP 2', '내가 내보내졌거나 나감 → 레일에서 빼요', { azit_id: 1, reason: 'kicked' }],
+  ['member.joined', 'MVP 1', '새 멤버', { azit_id: 1, member: MEMBER }],
+  ['member.updated', 'MVP 2', '닉네임·색·칭호', { azit_id: 1, member: MEMBER }],
+  ['member.left', 'MVP 2', '나감·내보내짐', { azit_id: 1, account_id: 9, reason: 'left' }],
+  ['presence', 'MVP 1', '접속·방해 금지 바뀜 (같은 아지트 사람에게만)', { account_id: 2, online: true, dnd: false }],
+  ['notification.created', 'MVP 2', '새 알림 → 종 배지', { notification: '알림 목록의 한 항목' }],
+  ['stickers.updated', 'MVP 2', '짤 추가·빼기·이름', { azit_id: 1 }],
+  ['reacts.updated', 'MVP 2', '맞장구 목록 바뀜', { azit_id: 1, reacts: '…' }],
+  ['game.updated', 'MVP 3', '라이어 판 상태. 받는 사람 시점으로 각자 다르게 만들어 보내요', { game: '라이어 판 상태(내 시점)' }],
+  ['session.revoked', 'MVP 1', '계정 멈춤·로그아웃 → 앱은 로그인 화면으로', { reason: 'account_disabled' }],
+  ['update.required', 'MVP 1', '앱 프로토콜이 너무 옛날', { min_protocol: 2 }],
+];
+
+/* 에러 코드 전체 (공통) */
+const COMMON_ERRORS = [
+  ['validation_failed', 400, '입력이 규칙에 안 맞음. <code>field</code>가 같이 와요'],
+  ['unauthorized', 401, '토큰 없음·만료·지워짐 → 로그인 화면'],
+  ['forbidden', 403, '권한 없음 (남의 메시지 지우기 등)'],
+  ['not_found', 404, '없거나, 내가 그 아지트 멤버가 아님 (둘을 구분하지 않아요)'],
+  ['conflict 류', 409, '상태가 안 맞음 (이름 겹침, 이미 판 있음 …)'],
+  ['gone 류', 410, '한때 있었지만 이제 못 씀 (폐기·만료 코드)'],
+  ['file_too_large', 413, '업로드 크기 초과'],
+  ['protocol_outdated', 426, '앱이 너무 옛날 → 업데이트 안내'],
+  ['*_rate_limited / *_cooldown', 429, '<code>Retry-After</code> 헤더 + <code>retry_after</code>(초)'],
+  ['internal', 500, '서버 버그. 로그에 <code>request_id</code>로 찾아요'],
+];
+
+/* =====================================================================
+ * 화면
+ * ===================================================================== */
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+let statusMap = {};
+try { statusMap = JSON.parse(localStorage.getItem('azit-api-status') || '{}'); } catch (e) { statusMap = {}; }
+function saveStatus() { try { localStorage.setItem('azit-api-status', JSON.stringify(statusMap)); } catch (e) {} }
+
+const VIEWS = [
+  ['all', '📋 전체'], ['MVP 1', '1️⃣ MVP 1 · 대화'], ['MVP 2', '2️⃣ MVP 2 · 카톡 대신'], ['MVP 3', '3️⃣ MVP 3 · 놀이'],
+  ['events', '⚡ 실시간 이벤트'], ['rules', '📐 공통 규칙'], ['models', '🧱 데이터 모양'],
+];
+let view = 'all', domainFilter = null, query = '', peekIndex = -1, visible = [];
+
+function tag(text, color, cls) { return `<span class="tag c-${color}${cls ? ' ' + cls : ''}">${esc(text)}</span>`; }
+function pathHtml(p) { return esc(p).replace(/\{([^}]+)\}/g, '<span class="param">{$1}</span>'); }
+
+function json(v) {
+  if (typeof v === 'string') return esc(v);
+  return esc(JSON.stringify(v, null, 2))
+    .replace(/(&quot;[^&]*?&quot;)(\s*:)/g, '<span class="k">$1</span>$2')
+    .replace(/:\s(&quot;.*?&quot;)/g, ': <span class="s">$1</span>')
+    .replace(/:\s(-?\d+(\.\d+)?|true|false|null)/g, ': <span class="n">$1</span>');
+}
+
+function renderTabs() {
+  const counts = { all: E.length, 'MVP 1': 0, 'MVP 2': 0, 'MVP 3': 0, events: EVENTS.length };
+  E.forEach((e) => counts[e.mvp]++);
+  $('#views').innerHTML = VIEWS.map(([k, label]) =>
+    `<button class="view-tab${k === view ? ' on' : ''}" data-view="${k}">${label}${counts[k] != null ? `<span class="n">${counts[k]}</span>` : ''}</button>`).join('');
+}
+
+function statusOf(id) { return statusMap[id] || 'todo'; }
+
+function renderTable() {
+  const rows = E.filter((e) => (view === 'all' || e.mvp === view) && (!domainFilter || e.domain === domainFilter) &&
+    (!query || (e.name + e.path + e.domain + (e.screens || '')).toLowerCase().includes(query.toLowerCase())));
+  visible = rows;
+  const pool = E.filter((e) => view === 'all' || e.mvp === view);
+  const done = pool.filter((e) => statusOf(e.id) === 'done').length;
+  const domains = [...new Set(pool.map((e) => e.domain))];
+
+  let html = `<div class="toolbar">
+    ${domains.map((d) => `<button class="filter${d === domainFilter ? ' on' : ''}" data-domain="${esc(d)}">${esc(d)}</button>`).join('')}
+    <div class="progress-wrap">완료 ${done}/${pool.length}<div class="progress"><span style="width:${pool.length ? done / pool.length * 100 : 0}%"></span></div></div>
+    <label class="search">🔍<input id="q" placeholder="이름·경로·화면 찾기" value="${esc(query)}"></label>
+  </div>`;
+
+  if (!rows.length) return html + '<div class="empty">맞는 API 가 없어요</div>';
+
+  html += `<div class="db-wrap"><table class="db"><thead><tr>
+    <th style="width:26%"><span class="ic">Aa</span>이름</th><th><span class="ic">◉</span>메서드</th><th><span class="ic">≡</span>경로</th>
+    <th><span class="ic">⊙</span>도메인</th><th><span class="ic">⊙</span>단계</th><th><span class="ic">🔑</span>인증</th><th><span class="ic">◐</span>상태</th></tr></thead><tbody>`;
+  let lastDomain = null;
+  rows.forEach((e, i) => {
+    if (e.domain !== lastDomain) {
+      const n = rows.filter((r) => r.domain === e.domain).length;
+      html += `<tr class="group-row"><td colspan="7">${tag(e.domain, DOMAINS[e.domain])}<span class="cnt">${n}</span></td></tr>`;
+      lastDomain = e.domain;
+    }
+    const st = STATUS.find((s) => s[0] === statusOf(e.id));
+    html += `<tr data-i="${i}">
+      <td><div class="name-cell"><span>📄</span><span>${esc(e.name)}</span><span class="open">열기</span></div></td>
+      <td>${tag(e.method, METHOD_COLOR[e.method], 'method')}</td>
+      <td><span class="path">${pathHtml(e.path)}</span></td>
+      <td>${tag(e.domain, DOMAINS[e.domain])}</td>
+      <td>${tag(e.mvp, MVP_COLOR[e.mvp])}</td>
+      <td style="color:var(--mu);font-size:13px">${esc(e.auth)}</td>
+      <td><button class="status-btn c-${st[2]}" data-status="${e.id}">${st[1]}</button></td></tr>`;
+  });
+  return html + '</tbody></table></div>';
+}
+
+function renderEvents() {
+  return `<div class="doc">
+  <p>WebSocket 으로 오는 것 전부. 봉투는 항상 <code>{"type": "…", "data": {…}}</code>. 앱(<code>desktop/internal/client</code>)이 받아서 <code>app.Event.Emit</code>으로 React 에 넘겨요.</p>
+  <div class="db-wrap"><table class="db" style="min-width:760px"><thead><tr><th>type</th><th>단계</th><th>언제</th><th style="width:38%">data</th></tr></thead><tbody>
+  ${EVENTS.map(([t, mvp, when, data]) => `<tr style="cursor:default"><td><code>${t}</code></td><td>${tag(mvp, MVP_COLOR[mvp])}</td><td>${when}</td><td><pre style="margin:0">${json(data)}</pre></td></tr>`).join('')}
+  </tbody></table></div></div>`;
+}
+
+function renderRules() {
+  return `<div class="doc">
+  <h2>요청 헤더</h2>
+  <pre>Authorization: Bearer az_s_Vx9...        <span class="c">// 인증 필요한 곳</span>
+X-Azit-Protocol: 1                        <span class="c">// 모든 요청. 서버 최소 버전보다 작으면 426</span>
+Content-Type: application/json</pre>
+
+  <h2>에러 응답</h2>
+  <p>상태 코드 + 항상 같은 모양. 앱은 <code>code</code>로 분기하고, <code>message</code>는 그대로 보여 줘도 되는 한국어 문구예요. 문구 원칙: 탓하지 않고, 원인과 다음 행동을 같이.</p>
+  <pre>${json({ error: { code: 'invite_revoked', message: '폐기된 코드예요. 친구에게 새 코드를 받아 주세요', field: null, retry_after: null, request_id: 'r_01J9…' } })}</pre>
+  <table class="mini"><tr><th>code</th><th>상태</th><th>뜻</th></tr>${COMMON_ERRORS.map(([c, s, d]) => `<tr><td><code>${c}</code></td><td>${s}</td><td>${d}</td></tr>`).join('')}</table>
+
+  <h3>초대 코드 오류 6종 (화면이 다 구분해서 보여 줘요)</h3>
+  <table class="mini"><tr><th>code</th><th>상태</th><th>문구</th></tr>
+  ${E.find((e) => e.id === 'invite-preview').errors.slice(0, 6).map(([c, s, m]) => `<tr><td><code>${c}</code></td><td>${s}</td><td>${m}</td></tr>`).join('')}</table>
+
+  <h2>빠진 메시지 채우기 (재접속)</h2>
+  <p>개요서 성공 기준 "유실·중복·순서 꼬임 0건"을 지키는 절차예요. 핵심은 <b>방마다 seq 가 1부터 빈칸 없이 늘어난다</b>는 것.</p>
+  <ol>
+    <li>앱은 방마다 <b>마지막으로 받은 seq</b>를 기억해요 (<code>map[roomID]int64</code>).</li>
+    <li>끊기면 WebSocket 을 다시 열고, 오는 이벤트를 <b>바로 반영하지 말고 잠깐 모아 둬요</b>.</li>
+    <li><code>GET /v1/azits/{id}/rooms</code>로 방마다 <code>last_seq</code>를 받아서, 내 seq 보다 크면 <code>GET /messages?after_seq=내 seq</code>로 채워요 (<code>has_more</code>면 반복).</li>
+    <li>채운 다음 모아 둔 이벤트를 반영해요. 이미 있는 seq 는 버려요 → 중복 0.</li>
+    <li>이벤트로 온 메시지의 seq 가 <code>내 seq + 1</code>보다 크면 사이가 빈 거예요 → 그 방만 3번을 다시.</li>
+  </ol>
+  <div class="callout go"><span class="ic">🐹</span><div>"모아 뒀다가 나중에 반영"이 채널을 쓰기 딱 좋은 자리예요. 이벤트를 받는 고루틴이 <code>chan Event</code>에 넣고, 채우기가 끝난 고루틴이 꺼내 가요.</div></div>
+
+  <h2>보내기와 중복 막기</h2>
+  <ol>
+    <li>앱이 UUID 로 <code>client_id</code>를 만들고, 화면에 "보내는 중" 메시지를 먼저 그려요.</li>
+    <li><code>POST /messages</code>. 응답이 안 오면 <b>같은 client_id 로</b> 다시 보내요.</li>
+    <li>서버는 <code>UNIQUE(author_id, client_id)</code> 덕분에 두 번 저장하지 않아요. 두 번째는 처음 것을 200 으로.</li>
+    <li>WebSocket 의 <code>message.created</code>에 내 client_id 가 있으면 "보내는 중"을 진짜 메시지로 바꿔요.</li>
+  </ol>
+
+  <h2>세션</h2>
+  <ul>
+    <li>토큰 <code>az_s_</code> + 32바이트 랜덤(base64url). DB 에는 <code>sha256</code>만 → DB 가 털려도 토큰은 못 씀.</li>
+    <li>30일. 쓸 때마다 남은 기간이 7일 아래면 늘려요(sliding).</li>
+    <li>매 요청 DB 조회 (JWT 안 씀). 계정을 멈추면 그 순간부터 401 + 열린 WebSocket 에 <code>session.revoked</code>.</li>
+    <li>앱은 토큰을 OS 보관소(Windows 자격 증명 관리자 / macOS 키체인)에 저장.</li>
+  </ul>
+
+  <h2>모두 주인 규칙</h2>
+  <ul>
+    <li>멤버면 누구나 모든 설정 API 를 부를 수 있어요. 권한 검사는 "이 아지트 멤버인가" 하나뿐.</li>
+    <li>방·아지트 <b>삭제 API 는 없어요</b>. 보관만.</li>
+    <li>설정을 바꾸는 API 는 전부 <code>audit_log</code>에 남기고, 되돌릴 수 있으면 <code>undo_json</code>을 적어요.</li>
+  </ul>
+
+  <h2>횟수 제한</h2>
+  <table class="mini"><tr><th>무엇</th><th>제한</th><th>에러</th></tr>
+    <tr><td>흔들기 (@멘션 포함)</td><td>보내는 사람당 1분 3회</td><td><code>shake_rate_limited</code></td></tr>
+    <tr><td>초대 코드 틀리기</td><td>계정·티켓당 1분 5회</td><td><code>too_many_attempts</code></td></tr>
+    <tr><td>아지트 이름 바꾸기</td><td>아지트당 10분 1회</td><td><code>name_cooldown</code></td></tr>
+    <tr><td>메시지 보내기</td><td>계정당 10초 20개 (도배 방지)</td><td><code>rate_limited</code></td></tr>
+  </table>
+
+  <h2>Go 서버 라우팅 모양</h2>
+  <pre><span class="c">// internal/app — Go 1.22+ ServeMux 패턴 (메서드 + 경로 + {와일드카드})</span>
+mux.HandleFunc(<span class="s">"GET /healthz"</span>, health)
+mux.Handle(<span class="s">"POST /v1/auth/google"</span>, h(auth.Google))
+mux.Handle(<span class="s">"GET /v1/azits/{azit_id}/rooms"</span>, authed(room.List))
+mux.Handle(<span class="s">"POST /v1/rooms/{room_id}/messages"</span>, authed(room.Send))
+<span class="c">// 핸들러 안에서: id := r.PathValue("room_id")</span></pre>
+  <div class="callout warn"><span class="ic">⚠️</span><div><code>{azit_id}</code>가 들어간 모든 API 는 "요청한 사람이 그 아지트 멤버인가"를 먼저 봐야 해요. 이걸 미들웨어 하나로 묶어 두면 빠뜨릴 일이 없어요.</div></div>
+  </div>`;
+}
+
+function renderModels() {
+  const models = [
+    ['Account', '계정 (구글 sub 로 연결)', { id: 1, name: '정문경', email: 'wjdans@gmail.com', dnd: false, created_at: '…' }],
+    ['AzitSummary', '레일 · 아지트 목록', { id: 1, name: '…', short: '의성', color: '#D4FF3A', desc: '…', member_count: 14, unread: 0, landing_room_id: 1, me: { nick: '4n5rud', color: '#D4FF3A', title: '눈치 백단' } }],
+    ['Member', '아지트 안의 사람 (아지트마다 닉네임·색 다름)', MEMBER],
+    ['Room', '방 (평평한 목록)', ROOM],
+    ['Message', '메시지. kind: text · image · sticker · game · poll · roulette · sys', MSG],
+    ['Message (sys)', '시스템 메시지는 문구 대신 구조로. 앱이 문구를 만들어요 (닉네임이 바뀌어도 맞게)', { id: 813, room_id: 3, seq: 129, kind: 'sys', sys: { type: 'shake | join | leave | kick | room_created | game_opened | game_result | code_join', actor_id: 2, target_id: 1, code: 'MK7Q2X', game_id: null } }],
+    ['InviteCode', '초대 코드. state 는 계산값', { code: 'MK7Q2X', state: 'live | revoked | expired | used', expires_at: '…', max_uses: 0, uses: 3, created_by: 1, created_by_nick: '4n5rud', joined: ['김환성'] }],
+    ['Event', 'WebSocket 봉투', { type: 'message.created', data: {} }],
+    ['Error', '모든 에러', { error: { code: 'room_name_taken', message: '같은 이름의 방이 이미 있어요', field: 'name', retry_after: null, request_id: 'r_…' } }],
+  ];
+  return `<div class="doc">
+  <p>이 구조체들은 <code>proto/</code> 모듈에 Go 구조체로 둬요. 서버와 앱이 같은 걸 import 하니까 필드 이름이 어긋날 수 없고, Wails 가 TypeScript 타입까지 만들어 줘요.</p>
+  <div class="callout go"><span class="ic">🐹</span><div>예: <code>type Room struct { ID int64 \`json:"id"\`; LastSeq int64 \`json:"last_seq"\`; LastMessage *MessagePreview \`json:"last_message"\` }</code> — 없을 수 있는 건 포인터로 두면 JSON 에서 <code>null</code>이 돼요.</div></div>
+  ${models.map(([n, d, v]) => `<h3>${n}</h3><p style="color:var(--mu);margin:0 0 4px">${d}</p><pre>${json(v)}</pre>`).join('')}
+  <h3>MVP 1 테이블 (개요서 + 추가 1개)</h3>
+  <table class="mini"><tr><th>테이블</th><th>핵심 제약</th></tr>
+    <tr><td>accounts</td><td><code>UNIQUE(google_sub)</code></td></tr>
+    <tr><td>sessions</td><td><code>PRIMARY KEY(token_hash)</code>, account_id 인덱스</td></tr>
+    <tr><td>azits</td><td>—</td></tr>
+    <tr><td>azit_members</td><td><code>PRIMARY KEY(azit_id, account_id)</code>, <code>UNIQUE(azit_id, nick)</code></td></tr>
+    <tr><td>invite_codes</td><td><code>PRIMARY KEY(code)</code></td></tr>
+    <tr><td>rooms</td><td><code>UNIQUE(azit_id, name)</code> (보관 포함), <code>last_seq</code> 컬럼</td></tr>
+    <tr><td>messages</td><td><code>UNIQUE(room_id, seq)</code>, <code>UNIQUE(author_id, client_id)</code></td></tr>
+    <tr><td>mentions</td><td><code>PRIMARY KEY(message_id, account_id)</code></td></tr>
+    <tr><td><b>room_reads</b> (추가)</td><td><code>PRIMARY KEY(room_id, account_id)</code>, seq — 안 읽은 수용</td></tr>
+  </table></div>`;
+}
+
+function renderPeek(i) {
+  const e = visible[i]; if (!e) return;
+  peekIndex = i;
+  const st = STATUS.find((s) => s[0] === statusOf(e.id));
+  let h = `<h2>${esc(e.name)}</h2>
+  <dl class="props">
+    <dt>◉ 메서드</dt><dd>${tag(e.method, METHOD_COLOR[e.method], 'method')}</dd>
+    <dt>⊙ 도메인</dt><dd>${tag(e.domain, DOMAINS[e.domain])}</dd>
+    <dt>⊙ 단계</dt><dd>${tag(e.mvp, MVP_COLOR[e.mvp])}</dd>
+    <dt>🔑 인증</dt><dd>${esc(e.auth)}</dd>
+    <dt>🖥 쓰는 화면</dt><dd style="color:var(--mu)">${esc(e.screens || '—')}</dd>
+    <dt>◐ 상태</dt><dd><button class="status-btn c-${st[2]}" data-status="${e.id}">${st[1]}</button></dd>
+  </dl>
+  <div class="endpoint-line">${tag(e.method, METHOD_COLOR[e.method], 'method')}<span class="path">${pathHtml(e.path)}</span></div>
+  ${e.desc ? `<p>${e.desc}</p>` : ''}`;
+
+  if (e.query) h += `<h3>쿼리</h3><table class="mini"><tr><th>이름</th><th>타입</th><th>설명</th></tr>${e.query.map(([n, t, d]) => `<tr><td><code>${n}</code></td><td>${t}</td><td>${d}</td></tr>`).join('')}</table>`;
+  if (e.table) h += `<h3>행동 목록 <code>{action}</code></h3><table class="mini"><tr><th>action</th><th>body</th><th>조건</th></tr>${e.table.map(([a, b, d]) => `<tr><td><code>${a}</code></td><td><code>${esc(b)}</code></td><td>${d}</td></tr>`).join('')}</table>`;
+  if (e.body) h += `<h3>요청</h3><pre>${json(e.body)}</pre>`;
+  if (e.status) h += `<h3>응답 <span style="font-weight:400;color:var(--mu);font-size:14px">${esc(e.status)}</span></h3>`;
+  if (e.res) h += `<pre>${json(e.res)}</pre>`;
+  if (e.extra) e.extra.forEach(([t, v]) => { h += `<h4>${esc(t)}</h4><pre>${json(v)}</pre>`; });
+  if (e.errors) h += `<h3>에러</h3><table class="mini"><tr><th>code</th><th>상태</th><th>화면 문구 / 뜻</th></tr>${e.errors.map(([c, s, m]) => `<tr><td><code>${c}</code></td><td>${s}</td><td>${m}</td></tr>`).join('')}</table>`;
+  if (e.notes) h += `<h3>규칙</h3><ul>${e.notes.map((n) => `<li>${n}</li>`).join('')}</ul>`;
+  if (e.go) h += `<div class="callout go"><span class="ic">🐹</span><div><b>Go 구현 메모</b><ul style="margin:6px 0 0">${e.go.map((n) => `<li>${n}</li>`).join('')}</ul></div></div>`;
+
+  $('#peek-body').innerHTML = h;
+  $('#peek-crumb').textContent = `${e.domain} / ${e.name}`;
+  $('#peek').classList.add('on'); $('#peek').setAttribute('aria-hidden', 'false');
+  $('#scrim').classList.add('on');
+  $('#peek-body').scrollTop = 0;
+}
+function closePeek() { $('#peek').classList.remove('on'); $('#peek').setAttribute('aria-hidden', 'true'); $('#scrim').classList.remove('on'); peekIndex = -1; }
+
+function render() {
+  renderTabs();
+  const c = $('#content');
+  if (view === 'events') c.innerHTML = renderEvents();
+  else if (view === 'rules') c.innerHTML = renderRules();
+  else if (view === 'models') c.innerHTML = renderModels();
+  else c.innerHTML = renderTable();
+  const q = $('#q');
+  if (q) q.addEventListener('input', (ev) => { query = ev.target.value; const pos = ev.target.selectionStart; render(); const n = $('#q'); n.focus(); n.setSelectionRange(pos, pos); });
+}
+
+document.addEventListener('click', (ev) => {
+  const st = ev.target.closest('[data-status]');
+  if (st) {
+    ev.stopPropagation();
+    const id = st.dataset.status; const i = STATUS.findIndex((s) => s[0] === statusOf(id));
+    statusMap[id] = STATUS[(i + 1) % STATUS.length][0]; saveStatus();
+    const keep = peekIndex; render(); if (keep >= 0) renderPeek(keep);
+    return;
+  }
+  const v = ev.target.closest('[data-view]');
+  if (v) { view = v.dataset.view; domainFilter = null; closePeek(); render(); return; }
+  const d = ev.target.closest('[data-domain]');
+  if (d) { domainFilter = domainFilter === d.dataset.domain ? null : d.dataset.domain; render(); return; }
+  const row = ev.target.closest('tr[data-i]');
+  if (row) { renderPeek(+row.dataset.i); return; }
+});
+$('#scrim').addEventListener('click', closePeek);
+$('#peek-close').addEventListener('click', closePeek);
+$('#peek-prev').addEventListener('click', () => peekIndex > 0 && renderPeek(peekIndex - 1));
+$('#peek-next').addEventListener('click', () => peekIndex < visible.length - 1 && renderPeek(peekIndex + 1));
+document.addEventListener('keydown', (ev) => {
+  if (peekIndex < 0) return;
+  if (ev.key === 'Escape') closePeek();
+  if (ev.key === 'ArrowDown' || ev.key === 'j') { ev.preventDefault(); if (peekIndex < visible.length - 1) renderPeek(peekIndex + 1); }
+  if (ev.key === 'ArrowUp' || ev.key === 'k') { ev.preventDefault(); if (peekIndex > 0) renderPeek(peekIndex - 1); }
+});
+render();
+</script>
+</body>
+</html>
