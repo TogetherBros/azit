@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "0.1.0"
+	},
+	"info": {
+		"0000": {
+			"ProductVersion": "0.1.0",
+			"CompanyName": "TogetherBros",
+			"FileDescription": "친구들끼리만 쓰는 메신저",
+			"LegalCopyright": "© 2026 TogetherBros",
+			"ProductName": "아지트",
+			"Comments": "This is a comment"
+		}
+	}
+}

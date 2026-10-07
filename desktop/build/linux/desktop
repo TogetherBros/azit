@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=아지트
+Comment=친구들끼리만 쓰는 메신저
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/azit.exe %u
+Terminal=false
+Type=Application
+Icon=azit.exe
+Categories=Utility;
+StartupWMClass=azit.exe
+
+ 
