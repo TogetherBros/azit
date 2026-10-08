@@ -699,13 +699,18 @@ Content-Type: application/json</pre>
     <tr><td>메시지 보내기</td><td>계정당 10초 20개 (도배 방지)</td><td><code>rate_limited</code></td></tr>
   </table>
 
-  <h2>Go 서버 라우팅 모양</h2>
-  <pre><span class="c">// internal/app — Go 1.22+ ServeMux 패턴 (메서드 + 경로 + {와일드카드})</span>
-mux.HandleFunc(<span class="s">"GET /healthz"</span>, health)
-mux.Handle(<span class="s">"POST /v1/auth/google"</span>, h(auth.Google))
-mux.Handle(<span class="s">"GET /v1/azits/{azit_id}/rooms"</span>, authed(room.List))
-mux.Handle(<span class="s">"POST /v1/rooms/{room_id}/messages"</span>, authed(room.Send))
-<span class="c">// 핸들러 안에서: id := r.PathValue("room_id")</span></pre>
+  <h2>Go 서버 라우팅 모양 (Fiber v3)</h2>
+  <pre><span class="c">// internal/app — 명세서의 {room_id} 는 Fiber 에서 :room_id</span>
+app := fiber.New(fiber.Config{ErrorHandler: httpx.ErrorHandler})
+app.Get(<span class="s">"/healthz"</span>, health)
+
+v1 := app.Group(<span class="s">"/v1"</span>)
+v1.Post(<span class="s">"/auth/google"</span>, auth.Google)
+
+authed := v1.Group(<span class="s">""</span>, auth.Required)        <span class="c">// 세션 미들웨어</span>
+authed.Get(<span class="s">"/azits/:azit_id/rooms"</span>, room.List)
+authed.Post(<span class="s">"/rooms/:room_id/messages"</span>, room.Send)
+<span class="c">// 핸들러: func(c fiber.Ctx) error — 안에서 c.Params("room_id")</span></pre>
   <div class="callout warn"><span class="ic">⚠️</span><div><code>{azit_id}</code>가 들어간 모든 API 는 "요청한 사람이 그 아지트 멤버인가"를 먼저 봐야 해요. 이걸 미들웨어 하나로 묶어 두면 빠뜨릴 일이 없어요.</div></div>
   </div>`;
 }
