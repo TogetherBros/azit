@@ -13,3 +13,6 @@ desktop/build/bin/
 
 # 구글 OAuth 클라이언트 시크릿 — 절대 커밋 금지
 client_secret*.json
+
+# 세션 인수인계 메모 (개인용)
+.handoff/
