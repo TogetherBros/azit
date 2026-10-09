@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "azit-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "desktop/frontend", "run", "dev"],
+      "port": 9245
+    }
+  ]
+}
