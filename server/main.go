@@ -7,10 +7,13 @@ import (
 )
 
 func main() {
+	cfg := LoadConfig()
+
 	app := fiber.New()
 
 	app.Get("/healthz", healthz)
 
+	log.Printf("Listening on port %d", cfg.Port)
 	log.Fatal(app.Listen(":8081"))
 }
 
