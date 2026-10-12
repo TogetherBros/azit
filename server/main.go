@@ -3,22 +3,28 @@ package main
 import (
 	"log"
 
+	"github.com/TogetherBros/azit/server/internal/account"
+	"github.com/TogetherBros/azit/server/internal/config"
+	"github.com/TogetherBros/azit/server/internal/db"
 	"github.com/gofiber/fiber/v3"
 )
 
 func main() {
-	cfg, err := LoadConfig()
+	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	db, err := OpenDB(cfg.DBDSN)
+	conn, err := db.Open(cfg.DBDSN)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	log.Printf("DB 연결 성공: %s", cfg.DBDSN)
-	_ = db // A2-3 에서 AutoMigrate 에 쓰면 지운다
+
+	if err := conn.AutoMigrate(&account.Account{}); err != nil {
+		log.Fatal(err)
+	}
 
 	app := fiber.New()
 

@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ type Config struct {
 	RefreshTTL     time.Duration
 }
 
-func LoadConfig() (Config, error) {
+func Load() (Config, error) {
 	cfg := Config{
 		Port:           getenv("PORT", "8081"),
 		DBDSN:          getenv("DB_DSN", "azit.db"),
