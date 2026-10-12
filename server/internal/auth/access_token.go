@@ -7,7 +7,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func IssueAT(secret string, accountID uint, ttl time.Duration) (string, error) {
+func IssueAccessToken(secret string, accountID uint, ttl time.Duration) (string, error) {
 	now := time.Now()
 
 	claims := jwt.RegisteredClaims{
@@ -20,7 +20,7 @@ func IssueAT(secret string, accountID uint, ttl time.Duration) (string, error) {
 	return token.SignedString([]byte(secret))
 }
 
-func ParseAT(secret string, tokenString string) (uint, error) {
+func ParseAccessToken(secret string, tokenString string) (uint, error) {
 	claims := &jwt.RegisteredClaims{}
 
 	_, err := jwt.ParseWithClaims(tokenString, claims,
