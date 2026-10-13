@@ -13,6 +13,7 @@ type Config struct {
 	JWTSecret      string
 	AccessTTL      time.Duration
 	RefreshTTL     time.Duration
+	Dev            bool
 }
 
 func Load() (Config, error) {
@@ -23,6 +24,7 @@ func Load() (Config, error) {
 		JWTSecret:      os.Getenv("JWT_SECRET"),
 		AccessTTL:      15 * time.Minute,    // Step 3에서 ACCESS_TOKEN_TTL_SEC 로 바꿈
 		RefreshTTL:     30 * 24 * time.Hour, // Step 3에서 REFRESH_TOKEN_TTL_SEC 로 바꿈
+		Dev:            os.Getenv("DEV") == "1",
 	}
 
 	// 빈 비밀키로도 JWT 서명은 되기 때문에, 아예 서버가 안 뜨게 막는다.
