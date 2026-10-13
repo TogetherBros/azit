@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"strconv"
 
 	"github.com/TogetherBros/azit/server/internal/account"
 	"github.com/TogetherBros/azit/server/internal/auth"
@@ -36,8 +35,14 @@ func main() {
 	app.Get("/healthz", healthz)
 	app.Get("/v1/me", auth.RequireAuth(tokenProvider), me)
 
+	refreshRepo := refresh.NewRepository(conn)
+	authHandler := auth.NewHandler(tokenProvider, refreshRepo)
+
+	api := app.Group("/v1")
+	authHandler.Routes(api.Group("/auth"))
+
 	if cfg.Dev {
-		app.Get("/dev/token", devToken(tokenProvider))
+		app.Get("/dev/token", authHandler.DevToken)
 		log.Println("⚠️ DEV 모드: /dev/token 이 켜져 있어요")
 	}
 
@@ -51,20 +56,4 @@ func healthz(c fiber.Ctx) error {
 
 func me(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"account_id": auth.AccountID(c)})
-}
-
-func devToken(tokenProvider *auth.TokenProvider) fiber.Handler {
-	return func(c fiber.Ctx) error {
-		accountID, err := strconv.ParseInt(c.Query("account_id"), 10, 64)
-		if err != nil {
-			return fiber.ErrBadRequest
-		}
-
-		at, err := tokenProvider.IssueAccessToken(accountID)
-		if err != nil {
-			return err
-		}
-
-		return c.JSON(fiber.Map{"access_token": at})
-	}
 }
