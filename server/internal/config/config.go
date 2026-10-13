@@ -18,6 +18,10 @@ type Config struct {
 }
 
 func Load() (Config, error) {
+	if err := loadDotEnv(".env"); err != nil {
+		return Config{}, err
+	}
+
 	cfg := Config{
 		Port:               getenv("PORT", "8081"),
 		DBDSN:              getenv("DB_DSN", "azit.db"),
