@@ -8,6 +8,7 @@ import (
 	"github.com/TogetherBros/azit/server/internal/auth/refresh"
 	"github.com/TogetherBros/azit/server/internal/config"
 	"github.com/TogetherBros/azit/server/internal/db"
+	"github.com/TogetherBros/azit/server/internal/httperr"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -30,13 +31,17 @@ func main() {
 
 	tokenProvider := auth.NewTokenProvider(cfg.JWTSecret, cfg.AccessTTL, cfg.RefreshTTL)
 
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		ErrorHandler: httperr.Handler,
+	})
 
 	app.Get("/healthz", healthz)
 	app.Get("/v1/me", auth.RequireAuth(tokenProvider), me)
 
 	refreshRepo := refresh.NewRepository(conn)
-	authHandler := auth.NewHandler(tokenProvider, refreshRepo)
+	accountRepo := account.NewRepository(conn)
+	googleClient := auth.NewGoogleClient(cfg.GoogleClientID, cfg.GoogleClientSecret)
+	authHandler := auth.NewHandler(tokenProvider, refreshRepo, accountRepo, googleClient)
 
 	api := app.Group("/v1")
 	authHandler.Routes(api.Group("/auth"))

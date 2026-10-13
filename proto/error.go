@@ -9,4 +9,12 @@ type ErrorBody struct {
 	Message string `json:"message"`
 }
 
-const ErrCodeUnauthorized = "unauthorized"
+const (
+	ErrCodeUnauthorized = "unauthorized"
+	ErrCodeBadRequest   = "bad_request"
+	ErrCodeNotFound     = "not_found"
+	ErrCodeInternal     = "internal"
+
+	ErrCodeGoogleExchangeFailed = "google_exchange_failed"
+	ErrCodeAccountDisabled      = "account_disabled"
+)
