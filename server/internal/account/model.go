@@ -10,7 +10,7 @@ const (
 )
 
 type Account struct {
-	ID        uint     `gorm:"primaryKey"`
+	ID        int64    `gorm:"primaryKey"`
 	Provider  Provider `gorm:"not null;uniqueIndex:idx_provider_subject"`
 	Subject   string   `gorm:"not null;uniqueIndex:idx_provider_subject"` // 구글이면 id_token 의 sub
 	Email     string   `gorm:"not null"`
