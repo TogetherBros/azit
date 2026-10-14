@@ -53,3 +53,10 @@ func (s *AuthService) IsLoggedIn() bool {
 	defer s.mu.Unlock()
 	return s.tokens.AccessToken != ""
 }
+
+// accessToken 은 지금 들고 있는 AT. 로그인 전이면 "".
+func (s *AuthService) accessToken() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.tokens.AccessToken
+}
