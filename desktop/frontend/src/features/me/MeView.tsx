@@ -1,3 +1,4 @@
+import type { ImageKind } from '../../api/profile'
 import type { Title } from '../../api/types'
 import { Avatar } from '../../components/Avatar'
 import { Toggle } from '../../components/Controls'
@@ -12,6 +13,9 @@ type Props = {
   dnd?: boolean
   dirty?: boolean // 고친 게 있으면 저장 버튼이 켜진다
   nameError?: string
+  busy?: ImageKind // 올리는 중인 사진
+  uploadError?: string
+  onPickImage?: (kind: ImageKind, file: File) => void // 없으면 미리보기용 (버튼만 보임)
 }
 
 const RARE_CLASS = { 일반: 'rare-common', 희귀: 'rare-rare', 전설: 'rare-legend' } as const
@@ -19,7 +23,7 @@ const BIO_MAX = 190
 
 // 내 정보: (왼쪽) 보이는 모습 · 계정 | (오른쪽) 프로필 고치기 · 칭호 도감
 // 프로필은 계정에 하나. 모든 아지트에서 똑같이 보인다.
-export function MeView({ azitShort, profile: p, email, titles, dnd, dirty, nameError }: Props) {
+export function MeView({ azitShort, profile: p, email, titles, dnd, dirty, nameError, busy, uploadError, onPickImage }: Props) {
   const unlocked = titles.filter((t) => t.unlocked).length
   return (
     <div className="main">
@@ -29,7 +33,7 @@ export function MeView({ azitShort, profile: p, email, titles, dnd, dirty, nameE
           <ProfileCard p={p} />
 
           <div className="card col">
-            <span className="b">계정 · {email}</span>
+            <span className="b">계정{email && ` · ${email}`}</span>
             <div className="row">
               <div className="grow col" style={{ gap: 2 }}>
                 <span className="b" style={{ fontSize: 13 }}>방해 금지</span>
@@ -48,17 +52,18 @@ export function MeView({ azitShort, profile: p, email, titles, dnd, dirty, nameE
               <span className="lbl">창문</span>
               <div className="banner-pick" style={{ background: p.color }}>
                 {p.bannerSrc && <img src={p.bannerSrc} alt="" />}
-                <button type="button" className="btn s sec">{p.bannerSrc ? '바꾸기' : '사진 올리기'}</button>
+                <PickButton kind="banner" has={!!p.bannerSrc} busy={busy} onPick={onPickImage} />
                 {p.bannerSrc && <button type="button" className="btn s sec">지우기</button>}
               </div>
               <span className="hint">출입증 위 집 모양 창문이에요. 사진이 없으면 내 색으로 칠해져요</span>
             </div>
+            {uploadError && <span role="alert" className="ferr">{uploadError}</span>}
 
             <div className="field">
               <span className="lbl">프로필 사진</span>
               <div className="row" style={{ gap: 14 }}>
                 <Avatar name={p.nickname} color={p.color} size={56} src={p.avatarSrc} />
-                <button type="button" className="btn s sec">{p.avatarSrc ? '바꾸기' : '사진 올리기'}</button>
+                <PickButton kind="avatar" has={!!p.avatarSrc} busy={busy} onPick={onPickImage} />
                 {p.avatarSrc && <button type="button" className="btn s sec">지우기</button>}
               </div>
             </div>
@@ -97,6 +102,7 @@ export function MeView({ azitShort, profile: p, email, titles, dnd, dirty, nameE
             </div>
           </form>
 
+          {titles.length > 0 && <>
           <div className="row" style={{ marginTop: 10 }}>
             <h2 className="page-title grow" style={{ fontSize: 28 }}>도감</h2>
             <span className="mu" style={{ fontSize: 13 }}>{unlocked}/{titles.length} · {azitShort} 기준</span>
@@ -122,8 +128,38 @@ export function MeView({ azitShort, profile: p, email, titles, dnd, dirty, nameE
               )
             })}
           </div>
+          </>}
         </section>
       </div>
     </div>
+  )
+}
+
+const ACCEPT = 'image/png,image/jpeg,image/webp'
+
+// 사진 올리기 버튼. onPick 이 있으면 누를 때 파일 고르기 창이 뜬다.
+function PickButton({ kind, has, busy, onPick }: {
+  kind: ImageKind
+  has: boolean
+  busy?: ImageKind
+  onPick?: (kind: ImageKind, file: File) => void
+}) {
+  const text = busy === kind ? '올리는 중…' : has ? '바꾸기' : '사진 올리기'
+  if (!onPick) return <button type="button" className="btn s sec">{text}</button>
+  return (
+    <label className={`btn s sec${busy ? ' disabled' : ''}`} aria-disabled={!!busy}>
+      {text}
+      <input
+        type="file"
+        accept={ACCEPT}
+        hidden
+        disabled={!!busy}
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          e.target.value = '' // 같은 파일을 다시 골라도 반응하게
+          if (f) onPick(kind, f)
+        }}
+      />
+    </label>
   )
 }

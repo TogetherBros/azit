@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { isCancelled, isLoggedIn, loginErrorText, startLogin, type LoginTask } from './api/auth'
 import { WindowFrame } from './app/WindowFrame'
-import { Preview } from './dev/Preview'
+import { MeScreen } from './features/me/MeScreen'
 import { LoginScreen } from './features/auth/LoginScreen'
 
 type Phase = 'checking' | 'out' | 'waiting' | 'in'
 
 // 로그인 전이면 LoginScreen, 로그인하면 본 화면.
-// 본 화면은 아직 진짜가 없어서 미리보기(Preview)를 띄운다.
+// 본 화면은 아직 내 정보(MeScreen)만 진짜다. 디자인 미리보기는 dev/Preview.tsx.
 export default function App() {
   const [phase, setPhase] = useState<Phase>('checking')
   const [error, setError] = useState<string>()
@@ -47,7 +47,7 @@ export default function App() {
   return (
     <WindowFrame>
       {phase === 'in' ? (
-        <Preview />
+        <MeScreen />
       ) : (
         <LoginScreen
           checking={phase === 'checking'}

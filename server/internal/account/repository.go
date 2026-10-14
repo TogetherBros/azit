@@ -99,3 +99,11 @@ func (r *Repository) UpdateProfile(ctx context.Context, id int64, p ProfileUpdat
 	}
 	return err
 }
+
+func (r *Repository) SaveAvatarKey(ctx context.Context, id int64, key string) error {
+	return r.db.WithContext(ctx).Model(&Account{ID: id}).Update("avatar_key", key).Error
+}
+
+func (r *Repository) SaveBannerKey(ctx context.Context, id int64, key string) error {
+	return r.db.WithContext(ctx).Model(&Account{ID: id}).Update("banner_key", key).Error
+}

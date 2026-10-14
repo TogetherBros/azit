@@ -137,3 +137,7 @@
 .pass-foot::before { left: -8px; }
 .pass-foot::after { right: -8px; }
 .pass-mark { color: var(--me); font-size: 16px; line-height: 1; }
+
+/* 사진 올리기 버튼은 파일 고르기 때문에 <label> 이다 */
+label.btn { cursor: pointer; }
+.btn.disabled { opacity: .5; pointer-events: none; }

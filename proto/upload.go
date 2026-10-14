@@ -10,3 +10,7 @@ type UploadResponse struct {
 	Key string `json:"key"`
 	URL string `json:"url"`
 }
+
+type SetImageRequest struct {
+	Key string `json:"key"`
+}

@@ -9,6 +9,7 @@ import (
 	"github.com/TogetherBros/azit/server/internal/config"
 	"github.com/TogetherBros/azit/server/internal/db"
 	"github.com/TogetherBros/azit/server/internal/httperr"
+	"github.com/TogetherBros/azit/server/internal/profile"
 	"github.com/TogetherBros/azit/server/internal/storage"
 	"github.com/TogetherBros/azit/server/internal/upload"
 	"github.com/gofiber/fiber/v3"
@@ -38,7 +39,6 @@ func main() {
 	})
 
 	app.Get("/healthz", healthz)
-	app.Get("/v1/me", auth.RequireAuth(tokenProvider), me)
 
 	refreshRepo := refresh.NewRepository(conn)
 	accountRepo := account.NewRepository(conn)
@@ -53,22 +53,21 @@ func main() {
 		log.Fatal(err)
 	}
 	uploadHandler := upload.NewHandler(r2)
+	profileHandler := profile.NewHandler(accountRepo, r2)
 
 	api.Post("/uploads", auth.RequireAuth(tokenProvider), uploadHandler.Create)
+	api.Get("/me", auth.RequireAuth(tokenProvider), profileHandler.Me)
+	api.Put("/me/avatar", auth.RequireAuth(tokenProvider), profileHandler.SaveAvatar)
+	api.Put("/me/banner", auth.RequireAuth(tokenProvider), profileHandler.SaveBanner)
 
 	if cfg.Dev {
 		app.Get("/dev/token", authHandler.DevToken)
 		log.Println("⚠️ DEV 모드: /dev/token 이 켜져 있어요")
 	}
-
 	log.Printf("Listening on port %s", cfg.Port)
 	log.Fatal(app.Listen(":" + cfg.Port))
 }
 
 func healthz(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"ok": true})
-}
-
-func me(c fiber.Ctx) error {
-	return c.JSON(fiber.Map{"account_id": auth.AccountID(c)})
 }
