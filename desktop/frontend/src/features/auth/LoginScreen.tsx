@@ -3,11 +3,14 @@ import logoBig from '../../assets/logo-big.webp'
 
 type Props = {
   waiting?: boolean // 기본 브라우저에서 구글 로그인 중
+  checking?: boolean // 앱 켤 때 이미 로그인돼 있는지 보는 중 (버튼 잠금)
   error?: string // "멈춘 계정이에요 ..." 등
+  onLogin?: () => void
+  onCancel?: () => void
 }
 
 // 첫 화면. 구글 로그인은 앱 안이 아니라 기본 브라우저에서 한다 (desktop/internal/login).
-export function LoginScreen({ waiting, error }: Props) {
+export function LoginScreen({ waiting, checking, error, onLogin, onCancel }: Props) {
   return (
     <AuthLayout>
       <div className="auth-body">
@@ -23,10 +26,12 @@ export function LoginScreen({ waiting, error }: Props) {
             <span className="auth-wait-dot" />
             <span className="b">브라우저에서 로그인을 마쳐 주세요</span>
             <span className="hint">끝나면 여기로 알아서 돌아와요</span>
-            <button type="button" className="btn s sec">취소</button>
+            <button type="button" className="btn s sec" onClick={onCancel}>취소</button>
           </div>
         ) : (
-          <button type="button" className="btn l p">구글로 들어가기</button>
+          <button type="button" className="btn l p" disabled={checking} onClick={onLogin}>
+            구글로 들어가기
+          </button>
         )}
 
         {error && <div role="alert" className="ferr auth-center">{error}</div>}

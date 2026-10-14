@@ -1,0 +1,29 @@
+/* 테두리 없는 창의 맨 위 줄. OS 제목줄(- □ x) 대신 쓴다.
+ * --wails-draggable: drag 인 곳을 잡고 끌면 창이 움직인다. 버튼은 no-drag. */
+
+.win { height: 100%; display: flex; flex-direction: column; }
+.win-body { flex: 1 1 auto; min-height: 0; position: relative; }
+
+.winbar {
+  --wails-draggable: drag;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  background: var(--bg);
+  user-select: none;
+}
+.winbar-btns { --wails-draggable: no-drag; display: flex; }
+
+.winbtn {
+  width: 46px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--mu);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.winbtn:hover { background: var(--s2); color: var(--tx); }
+.winbtn.close:hover { background: var(--red); color: var(--on-accent); }

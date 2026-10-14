@@ -272,3 +272,13 @@ export const LOGS: LogEntry[] = [
   { id: 'l4', ago: '어제', by: RYU, type: '설정', text: '아지트 이름을 바꿈', undoneBy: '4n5rud가' },
   { id: 'l5', ago: '3일 전', by: YOON, type: '맞장구', text: '맞장구 순서 바꿈', undoable: true },
 ]
+
+// 계정 프로필 (모든 아지트에서 같다)
+export const MY_PROFILE = {
+  nickname: '문경',
+  name: '4n5rud',
+  since: '2026.09.17',
+  color: '#D4FF3A',
+  title: '눈치 백단',
+  bio: '라이어게임 하자고 하면 바로 옴. 점심 내기 무패.',
+}

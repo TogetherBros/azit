@@ -1,0 +1,139 @@
+/* 계정 프로필: 카드(미리보기), 처음 만들기, 고치기 */
+
+.av { overflow: hidden; }
+.av-img { width: 100%; height: 100%; object-fit: cover; }
+
+
+/* 처음 만들기: 왼쪽 입력 | 오른쪽 미리보기 */
+.auth-body.setup { width: min(760px, 100%); gap: 22px; }
+.setup-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+.setup-preview { position: sticky; top: 0; }
+@media (max-width: 720px) {
+  .setup-grid { grid-template-columns: minmax(0, 1fr); }
+  .setup-preview { position: static; order: -1; }
+}
+
+/* 앞에 @ 가 붙는 입력칸. 테두리는 바깥 .inp 가 그린다 */
+.name-inp { display: flex; align-items: center; gap: 2px; }
+.name-inp:focus-within { border-color: var(--lime); box-shadow: 0 0 0 4px rgba(212, 255, 58, .15); }
+.name-inp.err:focus-within { border-color: var(--red); }
+.name-inp input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; font-family: var(--font-mono); }
+.hint.ok { color: var(--lime); }
+
+/* 고치기: 배너 칸 */
+.banner-pick { position: relative; height: 96px; border-radius: 0 0 16px 16px; clip-path: polygon(50% 0, 100% 30%, 100% 100%, 0 100%, 0 30%); overflow: hidden; display: flex; align-items: flex-end; justify-content: flex-end; padding: 8px; gap: 6px; }
+.banner-pick img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.banner-pick .btn { position: relative; }
+.count { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--mu); }
+
+/* 내 정보: 왼쪽(카드) 을 조금 줄여 오른쪽 편집칸이 옆에 오게 */
+.me-page .me-left { width: 300px; }
+.me-page .me-right { flex: 1 1 340px; min-width: 340px; }
+.me-page .me-left { position: sticky; top: 0; align-self: flex-start; }
+
+/* ---------- 아지트 출입증 (ProfileCard) ----------
+ * --me 는 그 사람의 색. 창문 바탕, @이름, 칭호 도장에 쓴다. */
+.pass {
+  position: relative;
+  border-radius: 24px;
+  background: var(--s1);
+  border-top: 5px solid var(--me);
+  padding: 12px 16px 0;
+  display: flex;
+  flex-direction: column;
+}
+.pass-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .12em;
+  color: var(--mu);
+}
+/* 목걸이 줄 끼우는 구멍 */
+.pass-hole { width: 34px; height: 8px; border-radius: 4px; background: var(--bg); }
+
+/* 집 모양 창문 = 배너. 사진이 없으면 내 색 */
+.pass-window {
+  position: relative;
+  height: 112px;
+  margin-top: 10px;
+  border-radius: 0 0 14px 14px;
+  background: var(--me);
+  clip-path: polygon(50% 0, 100% 30%, 100% 100%, 0 100%, 0 30%);
+  overflow: hidden;
+}
+.pass-window img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+/* 굴뚝: 로고 집처럼 지붕 오른쪽에 하나 */
+.pass-chimney { position: absolute; right: 24%; top: 38px; width: 16px; height: 24px; border-radius: 3px 3px 0 0; background: var(--me); }
+
+/* 사진은 동그라미가 아니라 비스듬히 붙인 스티커 */
+.pass-av {
+  position: absolute;
+  left: 22px;
+  top: 104px;
+  display: flex;
+  transform: rotate(-6deg);
+  border: 4px solid var(--tx);
+  border-radius: 24px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .45);
+}
+.pass-av .av { border-radius: 20px; }
+
+.pass-body { padding: 54px 2px 14px; display: flex; flex-direction: column; gap: 6px; }
+.pass-nick { font-family: var(--font-disp); font-size: 26px; line-height: 1.2; overflow-wrap: anywhere; }
+.pass-name { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--me); }
+
+/* 칭호 = 도장 */
+.pass-stamp {
+  align-self: flex-start;
+  margin: 4px 0 2px;
+  padding: 3px 10px;
+  border: 2px solid var(--me);
+  border-radius: 8px;
+  color: var(--me);
+  font-size: 12px;
+  font-weight: 800;
+  transform: rotate(-3deg);
+}
+
+/* 소개 = 내가 보낸 말풍선 */
+.pass-bio {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 9px 12px;
+  border-radius: 16px 16px 16px 4px;
+  background: var(--s2);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 뜯는 선. 양옆 반원 홈은 바탕색으로 판다 */
+.pass-foot {
+  position: relative;
+  margin: 0 -16px;
+  padding: 10px 16px 12px;
+  border-top: 1.5px dashed var(--line2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mu);
+}
+.pass-foot::before, .pass-foot::after {
+  content: "";
+  position: absolute;
+  top: -9px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bg);
+}
+.pass-foot::before { left: -8px; }
+.pass-foot::after { right: -8px; }
+.pass-mark { color: var(--me); font-size: 16px; line-height: 1; }

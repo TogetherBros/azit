@@ -42,15 +42,13 @@ func main() {
 	})
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:  "Window 1",
-		Width:  1000,
-		Height: 618,
-		Mac: application.MacWindow{
-			InvisibleTitleBarHeight: 50,
-			Backdrop:                application.MacBackdropTranslucent,
-			TitleBar:                application.MacTitleBarHiddenInset,
-		},
-		BackgroundColour: application.NewRGB(6, 7, 15),
+		Title:            "아지트",
+		Width:            1000,
+		Height:           618,
+		MinWidth:         400,
+		MinHeight:        500,
+		Frameless:        true,
+		BackgroundColour: application.NewRGB(14, 14, 18),
 		URL:              "/",
 	})
 

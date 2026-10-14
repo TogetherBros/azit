@@ -7,6 +7,7 @@ import { Toast } from '../components/Toast'
 import { ActivityView } from '../features/activity/ActivityView'
 import { JoinScreen } from '../features/auth/JoinScreen'
 import { LoginScreen } from '../features/auth/LoginScreen'
+import { ProfileSetupScreen } from '../features/auth/ProfileSetupScreen'
 import { AzitCreatedScreen } from '../features/azit/AzitCreatedScreen'
 import { CreateAzitScreen } from '../features/azit/CreateAzitScreen'
 import { KickModal, MemberModal } from '../features/azit/MemberModals'
@@ -106,6 +107,13 @@ const SCREENS: Record<string, () => ReactNode> = {
     />
   ),
   'join-nick': () => <JoinScreen step="nick" account="wjdans" nick="문경" color="#7BC4FF" />,
+  'profile-setup': () => <ProfileSetupScreen account="wjdans" profile={{ nickname: '정문경', name: '', color: '#D4FF3A' }} />,
+  'profile-setup-ok': () => (
+    <ProfileSetupScreen account="wjdans" profile={{ nickname: '문경', name: '4n5rud', color: '#7BC4FF', avatarSrc: M.PHOTO_SRC }} nameState="ok" />
+  ),
+  'profile-setup-taken': () => (
+    <ProfileSetupScreen account="wjdans" profile={{ nickname: '문경', name: 'mkmk1', color: '#FF5FA8' }} nameState="taken" />
+  ),
   'create': () => <CreateAzitScreen name="동네 친구들" />,
   'created': () => <AzitCreatedScreen name="동네 친구들" short="동네" color="#FF5FA8" code="H3BR9T" />,
 
@@ -162,7 +170,20 @@ const SCREENS: Record<string, () => ReactNode> = {
   'activity': () => <App view="activity" body={<ActivityView items={M.NOTIFS} />} />,
   'activity-empty': () => <App view="activity" body={<ActivityView items={[]} filter="칭호" />} />,
   'me': () => (
-    <App body={<MeView azitShort={AZ.short} me={M.ME} email="wjdans@gmail.com" stats={M.MY_STATS} titles={M.TITLES} />} />
+    <App body={<MeView azitShort={AZ.short} profile={M.MY_PROFILE} email="wjdans@gmail.com" titles={M.TITLES} />} />
+  ),
+  'me-edit': () => (
+    <App
+      body={
+        <MeView
+          azitShort={AZ.short}
+          profile={{ ...M.MY_PROFILE, avatarSrc: M.PHOTO_SRC, bannerSrc: M.PHOTO_SRC }}
+          email="wjdans@gmail.com"
+          titles={M.TITLES}
+          dirty
+        />
+      }
+    />
   ),
 
   // 아지트 설정

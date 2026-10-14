@@ -2,6 +2,7 @@
 export type IconName =
   | 'shake' | 'search' | 'plus' | 'gear' | 'bell' | 'send' | 'back'
   | 'x' | 'check' | 'chev' | 'wide' | 'narrow' | 'menu' | 'game' | 'star'
+  | 'min' | 'max'
 
 const PATHS: Partial<Record<IconName, string>> = {
   shake: 'M2 12l3-6 4 12 4-12 4 12 3-6h2',
@@ -16,6 +17,8 @@ const PATHS: Partial<Record<IconName, string>> = {
   wide: 'M3 5h18v14H3zM9 5v14',
   narrow: 'M7 2h10v20H7z',
   menu: 'M4 7h16M4 12h16M4 17h16',
+  min: 'M5 12h14',
+  max: 'M5 5h14v14H5z',
 }
 
 type Props = { name: IconName; size?: number; stroke?: number }
