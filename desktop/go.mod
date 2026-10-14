@@ -1,8 +1,11 @@
 module github.com/TogetherBros/azit/desktop
 
-go 1.25.0
+go 1.25.3
 
-require github.com/wailsapp/wails/v3 v3.0.0-beta.28
+require (
+	github.com/TogetherBros/azit/proto v0.0.0
+	github.com/wailsapp/wails/v3 v3.0.0-beta.28
+)
 
 require (
 	github.com/adrg/xdg v0.5.3 // indirect
@@ -13,3 +16,5 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 )
+
+replace github.com/TogetherBros/azit/proto => ../proto
