@@ -9,6 +9,8 @@ import (
 	"github.com/TogetherBros/azit/server/internal/config"
 	"github.com/TogetherBros/azit/server/internal/db"
 	"github.com/TogetherBros/azit/server/internal/httperr"
+	"github.com/TogetherBros/azit/server/internal/storage"
+	"github.com/TogetherBros/azit/server/internal/upload"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -45,6 +47,14 @@ func main() {
 
 	api := app.Group("/v1")
 	authHandler.Routes(api.Group("/auth"))
+
+	r2, err := storage.NewR2(cfg.R2AccountID, cfg.R2AccessKeyID, cfg.R2SecretAccessKey, cfg.R2Bucket)
+	if err != nil {
+		log.Fatal(err)
+	}
+	uploadHandler := upload.NewHandler(r2)
+
+	api.Post("/uploads", auth.RequireAuth(tokenProvider), uploadHandler.Create)
 
 	if cfg.Dev {
 		app.Get("/dev/token", authHandler.DevToken)
