@@ -3,6 +3,8 @@ package account
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math/rand/v2"
 
 	"gorm.io/gorm"
 )
@@ -46,4 +48,54 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (Account, error) {
 		return Account{}, err
 	}
 	return a, nil
+}
+
+// IsNameTaken 은 그 이름(@ 뒤)을 누가 이미 쓰고 있는지 본다.
+func (r *Repository) IsNameTaken(ctx context.Context, name string) (bool, error) {
+	var n int64
+	err := r.db.WithContext(ctx).Model(&Account{}).Where("name = ?", name).Count(&n).Error
+	return n > 0, err
+}
+
+// SuggestName 은 이메일로 아직 아무도 안 쓰는 이름을 하나 추천한다.
+// 추천일 뿐이라, 저장할 때 DB 유니크 인덱스가 한 번 더 막는다.
+func (r *Repository) SuggestName(ctx context.Context, email string) (string, error) {
+	base := NameBase(email)
+	candidate := base
+	for i := 0; i < 10; i++ {
+		taken, err := r.IsNameTaken(ctx, candidate)
+		if err != nil {
+			return "", err
+		}
+		if !taken {
+			return candidate, nil
+		}
+		candidate = fmt.Sprintf("%s%d", base, rand.IntN(9000)+1000)
+	}
+	return "", errors.New("이름을 추천하지 못했어요")
+}
+
+var ErrNameTaken = errors.New("이미 누가 쓰고 있는 이름이에요")
+
+// ProfileUpdate 는 사용자가 바꿀 수 있는 프로필 칸만 담는다.
+type ProfileUpdate struct {
+	Name     string
+	Nickname string
+	Bio      string
+	Color    string
+}
+
+// UpdateProfile 은 프로필을 저장한다. 이름이 겹치면 ErrNameTaken.
+// 빈 값("")도 저장해야 해서 구조체가 아니라 map 으로 넘긴다.
+func (r *Repository) UpdateProfile(ctx context.Context, id int64, p ProfileUpdate) error {
+	err := r.db.WithContext(ctx).Model(&Account{ID: id}).Updates(map[string]any{
+		"name":     p.Name,
+		"nickname": p.Nickname,
+		"bio":      p.Bio,
+		"color":    p.Color,
+	}).Error
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return ErrNameTaken
+	}
+	return err
 }

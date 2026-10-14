@@ -6,7 +6,7 @@ import (
 )
 
 func Open(dsn string) (*gorm.DB, error) {
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{TranslateError: true})
 	if err != nil {
 		return nil, err
 	}

@@ -159,7 +159,7 @@ func (h *Handler) Google(c fiber.Ctx) error {
 			Provider: account.ProviderGoogle,
 			Subject:  user.Subject,
 			Email:    user.Email,
-			Name:     user.Name,
+			Nickname: user.Name,
 		}
 		err = h.accountRepo.Create(ctx, &acc)
 	}
