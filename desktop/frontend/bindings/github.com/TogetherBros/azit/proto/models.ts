@@ -26,3 +26,25 @@ export interface MeResponse {
      */
     "needs_profile": boolean;
 }
+
+/**
+ * NameCheckResponse 는 GET /v1/me/name-check 의 응답.
+ */
+export interface NameCheckResponse {
+    "available": boolean;
+
+    /**
+     * 못 쓰는 이유. 쓸 수 있으면 빠진다
+     */
+    "message"?: string;
+}
+
+/**
+ * UpdateMeRequest 는 PATCH /v1/me 의 요청. 안 바뀐 칸도 네 칸 다 보낸다.
+ */
+export interface UpdateMeRequest {
+    "name": string;
+    "nickname": string;
+    "bio": string;
+    "color": string;
+}

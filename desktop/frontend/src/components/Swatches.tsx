@@ -1,9 +1,9 @@
 import { PICK_COLORS } from '../lib/color'
 
-type Props = { selected: string; square?: boolean; label: string }
+type Props = { selected: string; square?: boolean; label: string; onPick?: (color: string) => void }
 
 // 색 고르기. square = 아지트 아이콘 색(네모), 아니면 내 색(동그라미)
-export function Swatches({ selected, square, label }: Props) {
+export function Swatches({ selected, square, label, onPick }: Props) {
   return (
     <div className="swatches" role="group" aria-label={label}>
       {PICK_COLORS.map((c) => (
@@ -14,6 +14,7 @@ export function Swatches({ selected, square, label }: Props) {
           style={{ background: c }}
           aria-label={`색 ${c}`}
           aria-pressed={c === selected}
+          onClick={onPick && (() => onPick(c))}
         />
       ))}
     </div>

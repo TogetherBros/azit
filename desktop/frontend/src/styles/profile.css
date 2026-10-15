@@ -5,8 +5,9 @@
 
 
 /* 처음 만들기: 왼쪽 입력 | 오른쪽 미리보기 */
-.auth-body.setup { width: min(760px, 100%); gap: 22px; }
-.setup-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+.auth-body.setup { width: min(760px, 100%); gap: 16px; }
+.setup-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
+.setup-form { gap: 14px; }
 .setup-preview { position: sticky; top: 0; }
 @media (max-width: 720px) {
   .setup-grid { grid-template-columns: minmax(0, 1fr); }
@@ -21,18 +22,22 @@
 .hint.ok { color: var(--lime); }
 
 /* 고치기: 배너 칸 */
-.banner-pick { position: relative; height: 96px; border-radius: 0 0 16px 16px; clip-path: polygon(50% 0, 100% 30%, 100% 100%, 0 100%, 0 30%); overflow: hidden; display: flex; align-items: flex-end; justify-content: flex-end; padding: 8px; gap: 6px; }
+/* 출입증 배너와 같은 12:5 네모라 올린 사진이 카드에서도 똑같이 보인다 */
+.banner-pick { position: relative; flex-shrink: 0; width: 134px; aspect-ratio: 12 / 5; border-radius: 10px; overflow: hidden; }
 .banner-pick img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.banner-pick .btn { position: relative; }
 .count { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--mu); }
 
 /* 내 정보: 왼쪽(카드) 을 조금 줄여 오른쪽 편집칸이 옆에 오게 */
-.me-page .me-left { width: 300px; }
-.me-page .me-right { flex: 1 1 340px; min-width: 340px; }
-.me-page .me-left { position: sticky; top: 0; align-self: flex-start; }
+/* 기본 창(1000x618)에서 스크롤 없이 다 보이게 촘촘하게 */
+.me-page { max-width: 980px; margin: 0 auto; width: 100%; align-items: flex-start; padding: 18px 24px; gap: 20px; }
+.me-page .me-left { width: 290px; position: sticky; top: 0; gap: 10px; }
+.me-page .me-right { flex: 1 1 340px; min-width: 340px; padding-top: 24px; }
+.me-form { gap: 14px; }
+.me-form-foot { align-items: flex-end; gap: 8px; }
+.me-cap { font-size: 13px; font-weight: 800; color: var(--mu); }
 
 /* ---------- 아지트 출입증 (ProfileCard) ----------
- * --me 는 그 사람의 색. 창문 바탕, @이름, 칭호 도장에 쓴다. */
+ * --me 는 그 사람의 색. 배너 바탕, @이름, 칭호 도장에 쓴다. */
 .pass {
   position: relative;
   border-radius: 24px;
@@ -54,20 +59,17 @@
 /* 목걸이 줄 끼우는 구멍 */
 .pass-hole { width: 34px; height: 8px; border-radius: 4px; background: var(--bg); }
 
-/* 집 모양 창문 = 배너. 사진이 없으면 내 색 */
+/* 배너. 사진이 없으면 내 색 */
 .pass-window {
   position: relative;
   height: 112px;
   margin-top: 10px;
-  border-radius: 0 0 14px 14px;
+  border-radius: 14px;
   background: var(--me);
-  clip-path: polygon(50% 0, 100% 30%, 100% 100%, 0 100%, 0 30%);
   overflow: hidden;
 }
 .pass-window img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 
-/* 굴뚝: 로고 집처럼 지붕 오른쪽에 하나 */
-.pass-chimney { position: absolute; right: 24%; top: 38px; width: 16px; height: 24px; border-radius: 3px 3px 0 0; background: var(--me); }
 
 /* 사진은 동그라미가 아니라 비스듬히 붙인 스티커 */
 .pass-av {

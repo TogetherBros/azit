@@ -4,6 +4,7 @@ import type {
   Azit, ChatRow, GameRecord, InviteCode, LogEntry, Member, Notification,
   OpenGame, ReactOption, Room, Seat, Stats, Sticker, Title,
 } from '../api/types'
+import type { HomeAzit } from '../features/home/HomeView'
 
 /* ---------- 사람 · 아지트 · 방 ---------- */
 
@@ -29,8 +30,17 @@ export const AZITS: Azit[] = [
     memberCount: 14,
     unread: 0,
   },
-  { id: 'az2', name: '마크 원정대', short: '마크', color: '#7BC4FF', memberCount: 6, unread: 12 },
+  { id: 'az2', name: '마크 원정대', short: '마크', color: '#7BC4FF', memberCount: 6, unread: 12, banner: bannerSvg('#7BC4FF', '#B79CFF') },
   { id: 'az3', name: '동네 친구들', short: '동네', color: '#FF8A3D', memberCount: 9, unread: 0 },
+]
+
+// 홈 카드: 레일 아지트 + 접속 수 · 마지막 말
+export const HOME_AZITS: HomeAzit[] = [
+  { ...AZITS[0], online: 5, live: '게임방 · 라이어 판 모이는 중 3/8' },
+  { ...AZITS[1], online: 2, preview: '추승주: 성 다 지음 보러 와라', lastAgo: '2시간 전' },
+  { ...AZITS[2], online: 0, preview: '류승엽: 이번 주 토요일 됨?', lastAgo: '어제' },
+  { id: 'az4', name: '헬스 인증방', short: '헬스', color: '#FF5FA8', memberCount: 4, unread: 3, online: 1, banner: bannerSvg('#FF5FA8', '#FF8A3D') },
+  { id: 'az5', name: '롤 내전', short: '롤', color: '#B79CFF', memberCount: 10, unread: 0, online: 0 },
 ]
 
 export const ROOMS: Room[] = [
@@ -45,6 +55,12 @@ export const ROOM_OPTIONS = ROOMS.map((r) => ({ id: r.id, name: r.name, busy: r.
 /* ---------- 짤 · 맞장구 ---------- */
 
 // 짤 그림 대신 쓰는 단색 그림 (진짜 짤은 서버의 media 에서 온다)
+// 배너 사진 대신 쓰는 그라데이션
+function bannerSvg(a: string, b: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 100" preserveAspectRatio="none"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="240" height="100" fill="url(#g)"/><circle cx="190" cy="20" r="38" fill="#fff" opacity=".18"/></svg>`
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
+
 function stickerSvg(text: string, bg: string, fg = '#0E0E12'): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" rx="28" fill="${bg}"/><text x="60" y="72" font-size="30" font-family="sans-serif" font-weight="800" text-anchor="middle" fill="${fg}">${text}</text></svg>`
   return `data:image/svg+xml,${encodeURIComponent(svg)}`

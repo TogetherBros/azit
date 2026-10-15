@@ -11,7 +11,7 @@ export function Avatar({ name, color, size = 32, src }: Props) {
       style={{ width: size, height: size, background: color, fontSize: Math.round(size * 0.4) }}
       aria-hidden="true"
     >
-      {src ? <img src={src} alt="" className="av-img" /> : initial(name)}
+      {src ? <img src={src} alt="" className="av-img" onError={(e) => { e.currentTarget.style.display = 'none' }} /> : initial(name)}
     </span>
   )
 }

@@ -20,6 +20,24 @@ export async function getMe(): Promise<Me> {
   return (await ProfileService.Me()) as unknown as Me
 }
 
+// 고칠 수 있는 글자·색 (PATCH /v1/me 요청과 같은 모양). 네 칸을 다 보낸다.
+export type ProfileFields = { name: string; nickname: string; bio: string; color: string }
+
+// 프로필을 저장하고 저장된 내 정보를 받는다. 이름이 겹치면 "이미 누가 쓰고 있는 이름이에요" 오류.
+export async function updateMe(f: ProfileFields): Promise<Me> {
+  return (await ProfileService.UpdateMe(f)) as unknown as Me
+}
+
+export type NameCheck = { available: boolean; message?: string }
+
+// 그 이름을 쓸 수 있는지. 지금 내 이름이면 available.
+export async function checkName(name: string): Promise<NameCheck> {
+  return (await ProfileService.CheckName(name)) as NameCheck
+}
+
+// 이름 규칙 (서버 account.ValidateName 과 같다). 서버에 묻기 전에 먼저 걸러 낸다.
+export const NAME_RULE = /^[a-z0-9_]{5,20}$/
+
 // 사진 하나를 올리고 내 프사·배너로 저장한다. Go 가 서버 → R2 → 서버 순서로 처리한다.
 export async function uploadImage(kind: ImageKind, contentType: string, base64: string): Promise<void> {
   await ProfileService.UploadImage(kind, contentType, base64)

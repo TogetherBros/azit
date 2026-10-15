@@ -1,9 +1,8 @@
 import { AuthLayout } from '../../app/AuthLayout'
 import logoSmall from '../../assets/logo-small.webp'
 import { Mark } from '../../components/Mark'
-import { Swatches } from '../../components/Swatches'
 
-export type JoinStep = 'code' | 'preview' | 'nick'
+export type JoinStep = 'code' | 'preview'
 
 type Preview = {
   azitName: string
@@ -19,22 +18,20 @@ type Preview = {
 type Props = {
   step: JoinStep
   account: string // 오른쪽 위 "나가기 (계정)"
-  hasAzits?: boolean // 이미 아지트가 있으면 "돌아가기"
+  hasAzits?: boolean // 이미 아지트가 있으면 "홈으로"
   code?: string
   error?: string
   triesLeft?: number
   preview?: Preview
-  nick?: string
-  color?: string
 }
 
 const STEPS: [JoinStep, string][] = [
   ['code', '코드'],
   ['preview', '미리보기'],
-  ['nick', '닉네임'],
 ]
 
-// 초대 코드로 아지트에 들어가기: 코드 → 미리보기 → 닉네임
+// 초대 코드로 아지트에 들어가기: 코드 → 미리보기.
+// 프로필은 계정에 하나라서 아지트마다 닉네임을 따로 정하지 않는다.
 // 오류 6종(없음·폐기·만료·다 씀·막힘·꽉 참)은 error 글자로만 구분해 보여 준다.
 export function JoinScreen(p: Props) {
   const idx = STEPS.findIndex(([s]) => s === p.step)
@@ -45,7 +42,7 @@ export function JoinScreen(p: Props) {
         <img src={logoSmall} alt="아지트" />
       </div>
       <div className="auth-corner right">
-        {p.hasAzits && <button type="button" className="btn s sec">돌아가기</button>}
+        {p.hasAzits && <button type="button" className="btn s sec">홈으로</button>}
         <button type="button" className="btn s sec">나가기 ({p.account})</button>
       </div>
 
@@ -100,24 +97,6 @@ export function JoinScreen(p: Props) {
             </div>
             <button type="button" className="plain mu" style={{ alignSelf: 'center', fontSize: 13 }}>다른 코드 넣기</button>
           </div>
-        )}
-
-        {p.step === 'nick' && (
-          <form className="col" style={{ gap: 18 }} noValidate>
-            <h1 className="auth-title sm">여기서 뭐라고<br />불릴래요?</h1>
-            <div className="field">
-              <label htmlFor="join-nick">닉네임</label>
-              <input id="join-nick" className={`inp${p.error ? ' err' : ''}`} maxLength={12} defaultValue={p.nick} />
-              {p.error
-                ? <span role="alert" className="ferr">{p.error}</span>
-                : <span className="hint">아지트마다 다르게 정할 수 있어요</span>}
-            </div>
-            <div className="field">
-              <span className="lbl">내 색</span>
-              <Swatches selected={p.color ?? '#D4FF3A'} label="내 색" />
-            </div>
-            <button type="submit" className="btn l p">들어가기</button>
-          </form>
         )}
       </div>
     </AuthLayout>

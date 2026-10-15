@@ -59,6 +59,8 @@
 }
 .side-top { padding: 14px 14px 10px; display: flex; flex-direction: column; gap: 10px; }
 .side-azit { display: flex; align-items: flex-start; gap: 10px; }
+.side-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; margin: -4px 0 -2px -6px; padding: 4px 8px 4px 4px; border-radius: 10px; font-size: 12px; font-weight: 800; color: var(--mu); }
+.side-back:hover { background: var(--s2); color: var(--tx); }
 .side-azit-name { font-family: var(--font-disp); font-size: 15px; line-height: 1.3; word-break: keep-all; overflow-wrap: anywhere; }
 .side-azit-meta { font-size: 11px; font-weight: 800; color: var(--mu); }
 
@@ -140,3 +142,11 @@
 .mini .show-sm { display: flex !important; }
 .mini .page { padding: 16px; }
 .mini .head { padding: 0 12px; }
+
+/* 레일 맨 위 로고 = 홈. 홈을 보고 있으면 뒤에 판이 깔린다 */
+.rail-home { padding: 6px 4px 2px; border-radius: 16px; }
+.rail-home:hover { background: var(--s1); }
+.rail-home.on { background: var(--s2); }
+.rail-home .rail-logo { margin-bottom: 0; }
+.rail-me { border-radius: 50%; padding: 2px; }
+.rail-me.on { box-shadow: 0 0 0 2px var(--tx); }

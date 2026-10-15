@@ -29,3 +29,8 @@ export function loginErrorText(e: unknown): string {
   if (/[가-힣]/.test(msg) && !msg.includes('state')) return msg
   return '로그인하지 못했어요. 다시 해 주세요'
 }
+
+// 로그아웃. 서버가 꺼져 있어도 앱의 토큰은 버려진다.
+export async function logout(): Promise<void> {
+  await AuthService.Logout()
+}

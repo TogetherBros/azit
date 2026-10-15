@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"log"
 	"sync"
 
 	"github.com/TogetherBros/azit/desktop/internal/client"
@@ -52,6 +53,22 @@ func (s *AuthService) IsLoggedIn() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.tokens.AccessToken != ""
+}
+
+// Logout 은 들고 있던 토큰을 버린다. 서버에 RT 폐기를 알리는 건 실패해도 로그아웃은 된다
+// (서버가 꺼져 있어도 앱에서는 나갈 수 있어야 해서). 그 RT 는 서버에서 기한이 지나면 못 쓴다.
+func (s *AuthService) Logout(ctx context.Context) {
+	s.mu.Lock()
+	rt := s.tokens.RefreshToken
+	s.tokens = proto.TokenResponse{}
+	s.mu.Unlock()
+
+	if rt == "" {
+		return
+	}
+	if err := s.api.Logout(ctx, rt); err != nil {
+		log.Printf("로그아웃: 서버에 RT 폐기를 못 알렸어요: %v", err)
+	}
 }
 
 // accessToken 은 지금 들고 있는 AT. 로그인 전이면 "".

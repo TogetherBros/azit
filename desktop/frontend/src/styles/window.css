@@ -3,6 +3,8 @@
 
 .win { height: 100%; display: flex; flex-direction: column; }
 .win-body { flex: 1 1 auto; min-height: 0; position: relative; }
+/* 화면(.main)이 창 높이를 꽉 채워야 안쪽 .scroll 이 스크롤된다 */
+.win-body > .main { height: 100%; }
 
 .winbar {
   --wails-draggable: drag;

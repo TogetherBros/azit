@@ -23,6 +23,7 @@ export type Azit = {
   desc?: string
   memberCount: number
   unread: number
+  banner?: string // 배너 사진 주소. 없으면 아지트 색으로 칠한다
 }
 
 export type Room = {

@@ -10,13 +10,19 @@ type Props = {
   mini?: boolean
   query?: string
   active?: 'settings' | 'hub' // 본문에 설정/놀이터가 떠 있으면 그 버튼을 라임으로
+  onBack?: () => void // ← 홈으로
 }
 
-// 가운데 칸: 아지트 이름 · 놀이터 · 방 찾기 · 방 목록 · [+ 방 만들기][초대 코드]
-export function RoomList({ azit, rooms, currentRoomId, mini, query, active }: Props) {
+// 아지트 안 왼쪽 칸: ← 홈 · 아지트 이름 · 놀이터 · 방 찾기 · 방 목록 · [+ 방 만들기][초대 코드]
+// 아지트에 들어오면 레일(다른 아지트들)은 숨기고 이 칸만 보인다. 나갈 때는 ← 로 홈.
+export function RoomList({ azit, rooms, currentRoomId, mini, query, active, onBack }: Props) {
   return (
     <aside className="side" aria-label="방 목록">
       <div className="side-top">
+        <button type="button" className="plain side-back" onClick={onBack}>
+          <Icon name="back" size={16} />
+          홈으로
+        </button>
         <div className="side-azit">
           <Mark label={azit.short} color={azit.color} size="sm" />
           <div className="grow col" style={{ gap: 3 }}>

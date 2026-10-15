@@ -53,11 +53,13 @@
   width: 100%;
   padding: 0 14px;
   border-radius: 14px;
-  border: 1.5px solid var(--line2);
-  background: var(--bg);
+  border: 1.5px solid var(--line2); /* 명시표: 입력칸 테두리 = line-strong */
+  background: var(--s2); /* 카드(s1) 위에서도 바탕(bg) 위에서도 칸이 떠 보이게 */
   color: var(--tx);
   outline: none;
 }
+.inp:hover:not(:focus-within) { border-color: var(--mu); }
+.inp::placeholder, .inp input::placeholder { color: var(--tx-off); }
 .inp:focus { border-color: var(--lime); box-shadow: 0 0 0 4px rgba(212, 255, 58, .15); }
 .inp.err { border-color: var(--red); background: var(--red-field); }
 textarea.inp { height: auto; padding: 10px 14px; resize: vertical; }

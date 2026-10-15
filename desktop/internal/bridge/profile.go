@@ -9,7 +9,7 @@ import (
 	"github.com/TogetherBros/azit/proto"
 )
 
-// ProfileService 는 내 프로필 보기와 사진 올리기를 React 에 공개한다.
+// ProfileService 는 내 프로필 보기·고치기와 사진 올리기를 React 에 공개한다.
 // 토큰은 AuthService 가 들고 있어서 거기서 빌려 쓴다.
 type ProfileService struct {
 	api  *client.Client
@@ -23,6 +23,16 @@ func NewProfileService(api *client.Client, auth *AuthService) *ProfileService {
 // Me 는 내 프로필을 서버에서 받아 온다.
 func (s *ProfileService) Me(ctx context.Context) (proto.MeResponse, error) {
 	return s.api.Me(ctx, s.auth.accessToken())
+}
+
+// UpdateMe 는 내 프로필(이름, 닉네임, 소개, 색)을 저장하고, 저장된 프로필을 돌려준다.
+func (s *ProfileService) UpdateMe(ctx context.Context, req proto.UpdateMeRequest) (proto.MeResponse, error) {
+	return s.api.UpdateMe(ctx, s.auth.accessToken(), req)
+}
+
+// CheckName 은 그 이름을 쓸 수 있는지 알려 준다. 지금 내 이름이면 쓸 수 있다고 나온다.
+func (s *ProfileService) CheckName(ctx context.Context, name string) (proto.NameCheckResponse, error) {
+	return s.api.CheckName(ctx, s.auth.accessToken(), name)
 }
 
 // UploadImage 는 사진 하나를 R2 에 올리고 내 프사(kind "avatar")나 배너("banner")로 저장한다.

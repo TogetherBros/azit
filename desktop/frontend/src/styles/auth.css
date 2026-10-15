@@ -1,4 +1,4 @@
-/* 들어오기 화면들: 로그인, 초대 코드 입장(코드 → 미리보기 → 닉네임), 아지트 만들기 */
+/* 들어오기 화면들: 로그인, 초대 코드 입장(코드 → 미리보기), 아지트 만들기 */
 
 .authwrap {
   position: relative;
@@ -37,8 +37,8 @@
 .auth-wait-dot { width: 10px; height: 10px; border-radius: 5px; background: var(--lime); animation: blink 1s ease-in-out infinite; }
 @keyframes blink { 50% { opacity: .25; } }
 
-/* 단계 표시: ▬▬ 코드  ▬▬ 미리보기  ▬▬ 닉네임 */
-.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+/* 단계 표시: ▬▬ 코드  ▬▬ 미리보기 */
+.steps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
 .step { display: flex; flex-direction: column; gap: 6px; font-size: 11px; font-weight: 800; color: var(--mu); }
 .step::before { content: ""; height: 4px; border-radius: 2px; background: var(--line); }
 .step.on { color: var(--tx); }

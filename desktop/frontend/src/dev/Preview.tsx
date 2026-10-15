@@ -22,6 +22,7 @@ import { StickersTab } from '../features/azit/settings/StickersTab'
 import { DeleteMessageModal, ImageModal, PollModal, RouletteModal } from '../features/chat/ChatModals'
 import { ChatView } from '../features/chat/ChatView'
 import { ShakeModal } from '../features/chat/ShakeModal'
+import { HomeView } from '../features/home/HomeView'
 import { MeView } from '../features/me/MeView'
 import { HubView } from '../features/playground/HubView'
 import { LiarGameView } from '../features/playground/LiarGameView'
@@ -29,25 +30,24 @@ import { OpenGameModal } from '../features/playground/OpenGameForm'
 import { NewRoomModal } from '../features/rooms/NewRoomModal'
 import { RoomInfoModal } from '../features/rooms/RoomInfoModal'
 import { RoomList } from '../features/rooms/RoomList'
+import { AppSettingsView, DEFAULT_PREFS, type AppTab } from '../features/settings/AppSettingsView'
 import * as M from '../mock/data'
 
 const AZ = M.AZITS[0]
 const ROOM = M.ROOMS[0]
 const OTHERS = M.MEMBERS.filter((m) => m.id !== M.ME.id)
 
-// 레일 + 방 목록 + 본문. 본문을 안 주면 채팅.
+// 아지트 안: 방 목록 + 본문 (레일 없이 넓게). 본문을 안 주면 채팅.
 function App(props: {
   chat?: Partial<Parameters<typeof ChatView>[0]>
   body?: ReactNode
   active?: 'settings' | 'hub'
-  view?: 'activity'
   overlay?: ReactNode
   shaking?: boolean
 }) {
   return (
     <>
       <Shell shaking={props.shaking}>
-        <Rail azits={M.AZITS} currentId={AZ.id} me={M.ME} notifCount={2} view={props.view} />
         <RoomList azit={AZ} rooms={M.ROOMS} currentRoomId={props.body ? undefined : ROOM.id} active={props.active} />
         {props.body ?? (
           <ChatView
@@ -64,6 +64,20 @@ function App(props: {
     </>
   )
 }
+
+// 레일 + 본문 (방 목록 없이). 홈, 알림, 앱 설정
+function Bare({ view, body, azits = M.AZITS }: { view: 'home' | 'settings' | 'activity'; body: ReactNode; azits?: typeof M.AZITS }) {
+  return (
+    <Shell>
+      <Rail azits={azits} me={M.ME} notifCount={2} view={view} />
+      {body}
+    </Shell>
+  )
+}
+
+const appSettings = (tab: AppTab, prefs = DEFAULT_PREFS) => () => (
+  <Bare view="settings" body={<AppSettingsView tab={tab} me={M.MY_PROFILE} email="wjdans@gmail.com" prefs={prefs} />} />
+)
 
 const settings = (tab: SettingsTab, body: ReactNode) => () => (
   <App active="settings" body={<SettingsView tab={tab}>{body}</SettingsView>} />
@@ -106,7 +120,6 @@ const SCREENS: Record<string, () => ReactNode> = {
       }}
     />
   ),
-  'join-nick': () => <JoinScreen step="nick" account="wjdans" nick="문경" color="#7BC4FF" />,
   'profile-setup': () => <ProfileSetupScreen account="wjdans" profile={{ nickname: '정문경', name: '', color: '#D4FF3A' }} />,
   'profile-setup-ok': () => (
     <ProfileSetupScreen account="wjdans" profile={{ nickname: '문경', name: '4n5rud', color: '#7BC4FF', avatarSrc: M.PHOTO_SRC }} nameState="ok" />
@@ -167,10 +180,20 @@ const SCREENS: Record<string, () => ReactNode> = {
   'liar-watch': liar({ phase: 'describe', seats: M.SEATS.describe, player: false, round: '1/2바퀴', turn: '김환성' }),
 
   // 알림 · 내 정보
-  'activity': () => <App view="activity" body={<ActivityView items={M.NOTIFS} />} />,
-  'activity-empty': () => <App view="activity" body={<ActivityView items={[]} filter="칭호" />} />,
+  // 홈 (가입 후 첫 화면) · 앱 설정
+  'home': () => <Bare view="home" body={<HomeView nickname={M.MY_PROFILE.nickname} azits={M.HOME_AZITS} />} />,
+  'home-code': () => <Bare view="home" body={<HomeView nickname={M.MY_PROFILE.nickname} azits={M.HOME_AZITS} code="MK7Q2Z" codeError="없는 코드예요. 한 글자씩 다시 봐 주세요" />} />,
+  'home-empty': () => <Bare view="home" azits={[]} body={<HomeView nickname={M.MY_PROFILE.nickname} azits={[]} />} />,
+  'app-account': appSettings('account'),
+  'app-notify': appSettings('notify', { ...DEFAULT_PREFS, notify: 'mention' }),
+  'app-look': appSettings('look'),
+  'app-look-large': appSettings('look', { ...DEFAULT_PREFS, fontSize: 'l', clock: '24' }),
+  'app-app': appSettings('app'),
+
+  'activity': () => <Bare view="activity" body={<ActivityView items={M.NOTIFS} />} />,
+  'activity-empty': () => <Bare view="activity" body={<ActivityView items={[]} filter="칭호" />} />,
   'me': () => (
-    <App body={<MeView azitShort={AZ.short} profile={M.MY_PROFILE} email="wjdans@gmail.com" titles={M.TITLES} />} />
+    <App body={<MeView azitShort={AZ.short} profile={M.MY_PROFILE} titles={M.TITLES} />} />
   ),
   'me-edit': () => (
     <App
@@ -178,7 +201,6 @@ const SCREENS: Record<string, () => ReactNode> = {
         <MeView
           azitShort={AZ.short}
           profile={{ ...M.MY_PROFILE, avatarSrc: M.PHOTO_SRC, bannerSrc: M.PHOTO_SRC }}
-          email="wjdans@gmail.com"
           titles={M.TITLES}
           dirty
         />
@@ -208,13 +230,11 @@ const SCREENS: Record<string, () => ReactNode> = {
   // 작게 보기
   'mini': () => (
     <Shell mini>
-      <Rail azits={M.AZITS} currentId={AZ.id} me={M.ME} notifCount={2} />
       <ChatView mini room={ROOM} memberCount={AZ.memberCount} rows={M.CHAT_ROWS} reactOptions={M.REACTS} />
     </Shell>
   ),
   'mini-rooms': () => (
     <Shell mini>
-      <Rail azits={M.AZITS} currentId={AZ.id} me={M.ME} notifCount={2} />
       <RoomList mini azit={AZ} rooms={M.ROOMS} />
     </Shell>
   ),

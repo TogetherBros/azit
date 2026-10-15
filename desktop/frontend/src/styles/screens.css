@@ -244,3 +244,71 @@
   .hub-side, .game-chat, .snav, .phases { display: none; }
 }
 .mini .hub-side, .mini .game-chat, .mini .snav, .mini .phases { display: none; }
+
+/* ---------- 홈: 내 아지트 모아 보기 ---------- */
+.home-page { display: flex; gap: 20px; height: 100%; }
+.home-main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+.home-side { width: 260px; flex-shrink: 0; }
+/* 한 화면에 2x2 가 꽉 차게. 더 있으면 이 칸만 스크롤 */
+.home-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: calc((100% - 12px) / 2);
+  gap: 12px;
+  padding-right: 4px;
+}
+
+.home-azit {
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 1.5px solid var(--line);
+  border-radius: 20px;
+  background: var(--s1);
+  color: var(--tx);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: border-color .12s, background .12s;
+}
+.home-azit:hover { background: var(--s2); border-color: var(--line2); }
+.home-azit-banner { position: relative; flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.home-azit-banner img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.home-azit-banner .badge { position: absolute; top: 10px; right: 10px; }
+.home-azit-short { font-family: var(--font-disp); font-size: 34px; color: var(--on-accent); opacity: .9; }
+.home-azit-body { flex-shrink: 0; padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 4px; }
+.home-azit-name {
+  font-family: var(--font-disp);
+  font-size: 18px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.home-azit-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--mu); }
+.home-dot { width: 8px; height: 8px; border-radius: 4px; background: var(--lime); }
+.home-dot.off { background: var(--tx-off); }
+
+.home-join { gap: 12px; }
+.home-join .code-input.sm { height: 52px; font-size: 22px; }
+.home-or { display: flex; align-items: center; gap: 10px; font-size: 11px; font-weight: 800; color: var(--mu); }
+.home-or::before, .home-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+/* 아지트가 하나도 없을 때 */
+.home-empty { display: flex; }
+.home-empty-body { margin: auto; width: min(420px, 100%); display: flex; flex-direction: column; gap: 14px; }
+.home-join.big { padding: 22px; }
+
+/* ---------- 앱 설정 ---------- */
+.app-set { gap: 12px; max-width: 640px; }
+.app-set .page-title { margin-bottom: 6px; }
+.app-set-sample { display: flex; flex-direction: column; gap: 8px; padding: 14px; }
+.app-set-bubble { align-self: flex-start; max-width: 80%; padding: 9px 13px; border-radius: 18px 18px 18px 6px; background: var(--s3); line-height: 1.45; }
+.app-set-bubble.mine { align-self: flex-end; border-radius: 18px 18px 6px 18px; background: var(--lime); color: var(--on-accent); }
+.app-set-sample.fs-s .app-set-bubble { font-size: 13px; }
+.app-set-sample.fs-m .app-set-bubble { font-size: 15px; }
+.app-set-sample.fs-l .app-set-bubble { font-size: 17px; }

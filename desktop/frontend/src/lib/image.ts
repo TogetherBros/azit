@@ -1,14 +1,16 @@
 // 고른 사진을 올리기 좋게 줄인다. 원본이 커도 프사·배너로는 이 정도면 충분하다.
-// 프사: 가운데를 정사각형으로 잘라 512px. 배너: 비율 그대로 긴 쪽 1500px.
+// 프사: 가운데를 정사각형으로 잘라 512px. 배너: 가운데를 12:5 로 잘라 1440x600.
+// 배너를 화면 창문과 같은 비율로 미리 잘라 둬야 어디서 보든 똑같이 보인다.
 
 export type ShrunkImage = {
-  contentType: string // 브라우저가 실제로 만든 형식 (webp 를 못 만들면 png 로 나옴)
+  contentType: string // 실제로 만든 형식 (webp, 안 되면 jpeg)
   base64: string // Go 로 넘길 바이트
   size: number
 }
 
 const AVATAR_SIDE = 512
-const BANNER_LONG = 1500
+const BANNER_W = 1440
+const BANNER_H = 600
 
 export async function shrinkImage(file: File, kind: 'avatar' | 'banner'): Promise<ShrunkImage> {
   const img = await loadImage(file)
@@ -23,9 +25,18 @@ export async function shrinkImage(file: File, kind: 'avatar' | 'banner'): Promis
     sw = sh = side
     dw = dh = Math.min(side, AVATAR_SIDE)
   } else {
-    const scale = Math.min(1, BANNER_LONG / Math.max(sw, sh))
-    dw = Math.round(sw * scale)
-    dh = Math.round(sh * scale)
+    const ratio = BANNER_W / BANNER_H
+    if (sw / sh > ratio) {
+      const w = sh * ratio // 옆으로 길면 양옆을 자른다
+      sx = (sw - w) / 2
+      sw = w
+    } else {
+      const h = sw / ratio // 위아래로 길면 위아래를 자른다
+      sy = (sh - h) / 2
+      sh = h
+    }
+    dw = Math.round(Math.min(sw, BANNER_W))
+    dh = Math.round(dw / ratio)
   }
 
   const canvas = document.createElement('canvas')
@@ -36,10 +47,16 @@ export async function shrinkImage(file: File, kind: 'avatar' | 'banner'): Promis
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(img, sx, sy, sw, sh, 0, 0, dw, dh)
 
-  const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, 'image/webp', 0.9))
+  // 맥(WebKit)은 webp 로 못 만들고 png 를 돌려준다. png 는 사진치고 너무 커서 그땐 jpeg 로 다시 만든다.
+  let blob = await toBlob(canvas, 'image/webp')
+  if (!blob || blob.type !== 'image/webp') blob = await toBlob(canvas, 'image/jpeg')
   if (!blob) throw new Error('사진을 줄이지 못했어요')
 
   return { contentType: blob.type, base64: await toBase64(blob), size: blob.size }
+}
+
+function toBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob | null> {
+  return new Promise((ok) => canvas.toBlob(ok, type, 0.9))
 }
 
 function loadImage(file: File): Promise<HTMLImageElement> {

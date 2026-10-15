@@ -25,3 +25,11 @@ export function IsLoggedIn(): $CancellablePromise<boolean> {
 export function Login(): $CancellablePromise<void> {
     return $Call.ByID(681755554);
 }
+
+/**
+ * Logout 은 들고 있던 토큰을 버린다. 서버에 RT 폐기를 알리는 건 실패해도 로그아웃은 된다
+ * (서버가 꺼져 있어도 앱에서는 나갈 수 있어야 해서). 그 RT 는 서버에서 기한이 지나면 못 쓴다.
+ */
+export function Logout(): $CancellablePromise<void> {
+    return $Call.ByID(1775963067);
+}

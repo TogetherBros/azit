@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/TogetherBros/azit/proto"
@@ -47,6 +48,25 @@ func (c *Client) Me(ctx context.Context, token string) (proto.MeResponse, error)
 	var out proto.MeResponse
 	err := c.do(ctx, http.MethodGet, "/v1/me", token, nil, &out)
 	return out, err
+}
+
+// UpdateMe 는 내 프로필(이름, 닉네임, 소개, 색)을 저장하고, 저장된 프로필을 받는다.
+func (c *Client) UpdateMe(ctx context.Context, token string, req proto.UpdateMeRequest) (proto.MeResponse, error) {
+	var out proto.MeResponse
+	err := c.do(ctx, http.MethodPatch, "/v1/me", token, req, &out)
+	return out, err
+}
+
+// CheckName 은 그 이름(@ 뒤)을 내가 쓸 수 있는지 물어본다.
+func (c *Client) CheckName(ctx context.Context, token, name string) (proto.NameCheckResponse, error) {
+	var out proto.NameCheckResponse
+	err := c.do(ctx, http.MethodGet, "/v1/me/name-check?name="+url.QueryEscape(name), token, nil, &out)
+	return out, err
+}
+
+// Logout 은 서버에 RT 를 버리라고 알린다. 그 RT 로는 더 갱신할 수 없다.
+func (c *Client) Logout(ctx context.Context, refreshToken string) error {
+	return c.do(ctx, http.MethodPost, "/v1/auth/logout", "", proto.RefreshRequest{RefreshToken: refreshToken}, nil)
 }
 
 // CreateUpload 는 서버에서 R2 업로드 주소(10분짜리)와 key 를 받는다.
