@@ -17,4 +17,5 @@ const (
 
 	ErrCodeGoogleExchangeFailed = "google_exchange_failed"
 	ErrCodeAccountDisabled      = "account_disabled"
+	ErrCodeNameTaken            = "name_taken"
 )

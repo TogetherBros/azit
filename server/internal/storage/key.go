@@ -14,6 +14,8 @@ const (
 	KindAvatar Kind = "avatar"
 	KindBanner Kind = "banner"
 	KindMeme   Kind = "meme"
+
+	KindAzitBanner Kind = "azit_banner" // 아지트 배너. 내 프로필 배너(KindBanner)와 폴더가 다르다
 )
 
 var (
@@ -46,6 +48,8 @@ var rules = map[Kind]rule{
 	KindAvatar: {prefix: "avatars", maxSize: 5 << 20, exts: imageExts},
 	KindBanner: {prefix: "banners", maxSize: 5 << 20, exts: imageExts},
 	KindMeme:   {prefix: "memes", maxSize: 10 << 20, exts: memeExts},
+
+	KindAzitBanner: {prefix: "azit-banners", maxSize: 5 << 20, exts: imageExts},
 }
 
 // NewKey 는 업로드 요청을 검사하고, 통과하면 R2 저장 경로를 만든다.

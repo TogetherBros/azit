@@ -18,6 +18,11 @@ func NewHandler(r2 *storage.R2) *Handler {
 	return &Handler{r2: r2}
 }
 
+// Routes 는 /v1/uploads 아래 경로를 붙인다. r 에는 인증 미들웨어가 걸려 있어야 한다.
+func (h *Handler) Routes(r fiber.Router) {
+	r.Post("/", h.Create)
+}
+
 func (h *Handler) Create(c fiber.Ctx) error {
 	var req proto.UploadRequest
 	if err := c.Bind().JSON(&req); err != nil {
