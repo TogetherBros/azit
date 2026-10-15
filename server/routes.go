@@ -27,7 +27,10 @@ func newApp(cfg config.Config, h *handlers, tokenProvider *auth.TokenProvider) *
 	h.auth.Routes(api.Group("/auth"))
 	h.upload.Routes(api.Group("/uploads", requireAuth))
 	h.profile.Routes(api.Group("/me", requireAuth))
-	h.azit.Routes(api.Group("/azits", requireAuth))
+	azits := api.Group("/azits", requireAuth)
+	h.azit.Routes(azits)
+	h.invite.AzitRoutes(azits)
+	h.invite.Routes(api.Group("/invites", requireAuth))
 
 	if cfg.Dev {
 		app.Get("/dev/token", h.auth.DevToken)

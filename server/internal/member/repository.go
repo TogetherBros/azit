@@ -2,9 +2,13 @@ package member
 
 import (
 	"context"
+	"errors"
 
 	"gorm.io/gorm"
 )
+
+// ErrNotMember 는 그 아지트에 들어와 있지 않을 때 (나간 사람 포함).
+var ErrNotMember = errors.New("이 아지트 멤버가 아니에요")
 
 type Repository struct {
 	db *gorm.DB
@@ -41,4 +45,16 @@ func (r *Repository) CountActive(ctx context.Context, azitIDs []int64) (map[int6
 		counts[row.AzitID] = row.Count
 	}
 	return counts, nil
+}
+
+// FindActive 는 지금 들어와 있는 멤버 한 명을 찾는다. 없거나 나갔으면 ErrNotMember.
+func (r *Repository) FindActive(ctx context.Context, azitID, accountID int64) (Member, error) {
+	var m Member
+	err := r.db.WithContext(ctx).
+		Where("azit_id = ? AND account_id = ? AND left_at IS NULL", azitID, accountID).
+		First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return Member{}, ErrNotMember
+	}
+	return m, err
 }

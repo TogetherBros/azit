@@ -61,6 +61,8 @@ func codeFor(status int) string {
 		return proto.ErrCodeUnauthorized
 	case fiber.StatusBadRequest:
 		return proto.ErrCodeBadRequest
+	case fiber.StatusForbidden:
+		return proto.ErrCodeForbidden
 	case fiber.StatusNotFound:
 		return proto.ErrCodeNotFound
 	default:

@@ -4,6 +4,7 @@ import (
 	"github.com/TogetherBros/azit/server/internal/account"
 	"github.com/TogetherBros/azit/server/internal/auth/refresh"
 	"github.com/TogetherBros/azit/server/internal/azit"
+	"github.com/TogetherBros/azit/server/internal/invite"
 	"github.com/TogetherBros/azit/server/internal/member"
 	"gorm.io/gorm"
 )
@@ -15,5 +16,6 @@ func migrate(db *gorm.DB) error {
 		&refresh.Token{},
 		&azit.Azit{},
 		&member.Member{},
+		&invite.Invite{},
 	)
 }

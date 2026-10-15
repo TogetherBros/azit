@@ -2,14 +2,13 @@ package azit
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 
 	"github.com/TogetherBros/azit/server/internal/member"
 	"gorm.io/gorm"
 )
 
-var ErrCodeGeneration = errors.New("초대 코드를 만들지 못했어요")
+var ErrNotFound = errors.New("아지트가 없어요")
 
 type Repository struct {
 	db *gorm.DB
@@ -17,6 +16,16 @@ type Repository struct {
 
 func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
+}
+
+// FindByID 는 아지트 하나를 찾는다. 없으면 ErrNotFound.
+func (r *Repository) FindByID(ctx context.Context, id int64) (Azit, error) {
+	var a Azit
+	err := r.db.WithContext(ctx).First(&a, id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return Azit{}, ErrNotFound
+	}
+	return a, err
 }
 
 func (r *Repository) FindMyAzits(ctx context.Context, accountID int64) ([]Azit, error) {
@@ -45,16 +54,10 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (Azit, error
 	var azit Azit
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		code, err := newInviteCode()
-		if err != nil {
-			return err
-		}
-
 		azit = Azit{
 			MasterID:  input.MasterID,
 			Name:      input.Name,
 			Color:     input.Color,
-			Code:      code,
 			BannerKey: input.BannerKey,
 		}
 		if err := tx.Create(&azit).Error; err != nil {
@@ -70,19 +73,4 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (Azit, error
 	})
 
 	return azit, err
-}
-
-const inviteCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-
-func newInviteCode() (string, error) {
-	code := make([]byte, 6)
-	random := make([]byte, len(code))
-	if _, err := rand.Read(random); err != nil {
-		return "", ErrCodeGeneration
-	}
-
-	for i := range code {
-		code[i] = inviteCodeAlphabet[int(random[i])%len(inviteCodeAlphabet)]
-	}
-	return string(code), nil
 }

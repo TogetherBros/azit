@@ -6,6 +6,7 @@ import (
 	"github.com/TogetherBros/azit/server/internal/auth/refresh"
 	"github.com/TogetherBros/azit/server/internal/azit"
 	"github.com/TogetherBros/azit/server/internal/config"
+	"github.com/TogetherBros/azit/server/internal/invite"
 	"github.com/TogetherBros/azit/server/internal/member"
 	"github.com/TogetherBros/azit/server/internal/profile"
 	"github.com/TogetherBros/azit/server/internal/storage"
@@ -19,6 +20,7 @@ type handlers struct {
 	profile *profile.Handler
 	upload  *upload.Handler
 	azit    *azit.Handler
+	invite  *invite.Handler
 }
 
 // newHandlers 는 repo 와 외부 클라이언트를 만들고 handler 에 꽂아 준다.
@@ -28,6 +30,7 @@ func newHandlers(cfg config.Config, conn *gorm.DB, tokenProvider *auth.TokenProv
 	refreshRepo := refresh.NewRepository(conn)
 	memberRepo := member.NewRepository(conn)
 	azitRepo := azit.NewRepository(conn)
+	inviteRepo := invite.NewRepository(conn)
 
 	googleClient := auth.NewGoogleClient(cfg.GoogleClientID, cfg.GoogleClientSecret)
 	r2, err := storage.NewR2(cfg.R2AccountID, cfg.R2AccessKeyID, cfg.R2SecretAccessKey, cfg.R2Bucket)
@@ -40,5 +43,6 @@ func newHandlers(cfg config.Config, conn *gorm.DB, tokenProvider *auth.TokenProv
 		profile: profile.NewHandler(accountRepo, r2),
 		upload:  upload.NewHandler(r2),
 		azit:    azit.NewHandler(accountRepo, memberRepo, azitRepo, r2),
+		invite:  invite.NewHandler(inviteRepo, azitRepo, memberRepo, accountRepo, r2),
 	}, nil
 }
