@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/TogetherBros/azit/server/internal/member"
+	"github.com/TogetherBros/azit/server/internal/room"
 	"gorm.io/gorm"
 )
 
@@ -64,11 +65,20 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (Azit, error
 			return err
 		}
 
-		return tx.Create(&member.Member{
+		if err := tx.Create(&member.Member{
 			AzitID:    azit.AzitID,
 			AccountID: input.MasterID,
 			NickName:  input.Nickname,
 			Role:      member.RoleSuperAdmin,
+		}).Error; err != nil {
+			return err
+		}
+
+		return tx.Create(&room.Room{
+			AzitID:    azit.AzitID,
+			Name:      room.DefaultName,
+			Position:  0,
+			CreatedBy: input.MasterID,
 		}).Error
 	})
 

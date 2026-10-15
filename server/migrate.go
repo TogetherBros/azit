@@ -6,6 +6,7 @@ import (
 	"github.com/TogetherBros/azit/server/internal/azit"
 	"github.com/TogetherBros/azit/server/internal/invite"
 	"github.com/TogetherBros/azit/server/internal/member"
+	"github.com/TogetherBros/azit/server/internal/room"
 	"gorm.io/gorm"
 )
 
@@ -17,5 +18,6 @@ func migrate(db *gorm.DB) error {
 		&azit.Azit{},
 		&member.Member{},
 		&invite.Invite{},
+		&room.Room{},
 	)
 }
