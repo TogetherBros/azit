@@ -18,3 +18,9 @@ type RoomResponse struct {
 	Name     string `json:"name"`
 	Position int    `json:"position"` // 작을수록 위
 }
+
+// ReorderRoomsRequest 는 PUT /v1/azits/{id}/rooms/order 의 요청이다.
+// 그 아지트 방 전부를 새 순서대로 담는다.
+type ReorderRoomsRequest struct {
+	RoomIDs []int64 `json:"room_ids"`
+}
