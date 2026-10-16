@@ -16,6 +16,7 @@ import { GeneralTab } from '../features/azit/settings/GeneralTab'
 import { LeaveTab } from '../features/azit/settings/LeaveTab'
 import { LogTab } from '../features/azit/settings/LogTab'
 import { MembersTab } from '../features/azit/settings/MembersTab'
+import { ReactsTab } from '../features/azit/settings/ReactsTab'
 import { RoomsTab } from '../features/azit/settings/RoomsTab'
 import { SettingsView, type SettingsTab } from '../features/azit/settings/SettingsView'
 import { StickersTab } from '../features/azit/settings/StickersTab'
@@ -182,7 +183,7 @@ const SCREENS: Record<string, () => ReactNode> = {
   // 알림 · 내 정보
   // 홈 (가입 후 첫 화면) · 앱 설정
   'home': () => <Bare view="home" body={<HomeView nickname={M.MY_PROFILE.nickname} azits={M.HOME_AZITS} />} />,
-  'home-code': () => <Bare view="home" body={<HomeView nickname={M.MY_PROFILE.nickname} azits={M.HOME_AZITS} code="MK7Q2Z" codeError="없는 코드예요. 한 글자씩 다시 봐 주세요" />} />,
+  'home-code': () => <Bare view="home" body={<HomeView nickname={M.MY_PROFILE.nickname} azits={M.HOME_AZITS} code="MK7Q-2ZAB" codeError="없는 코드예요. 한 글자씩 다시 봐 주세요" />} />,
   'home-empty': () => <Bare view="home" azits={[]} body={<HomeView nickname={M.MY_PROFILE.nickname} azits={[]} />} />,
   'app-account': appSettings('account'),
   'app-notify': appSettings('notify', { ...DEFAULT_PREFS, notify: 'mention' }),
@@ -223,7 +224,12 @@ const SCREENS: Record<string, () => ReactNode> = {
   'set-rooms-landing': settings('rooms', (
     <RoomsTab rooms={M.ROOMS} archived={[]} selectedId="r1" selectedInfo="4n5rud가 만듦 · 3주 전 · 메시지 128개" />
   )),
-  'set-stickers': settings('stickers', <StickersTab reacts={M.REACTS} stickers={M.STICKERS} pickingSticker renamingId="st2" />),
+  'set-reacts': settings('reacts', <ReactsTab reacts={M.REACT_LIST} draft="실화냐" />),
+  'set-reacts-dup': settings('reacts', <ReactsTab reacts={M.REACT_LIST} draft="ㅋㅋ" error="ㅋㅋ는 이미 목록에 있어요" />),
+  'set-reacts-full': settings('reacts', <ReactsTab reacts={M.REACT_LIST_FULL} draft="ㄹㅇ" error="10개 꽉 찼어요. 하나 빼고 넣어 주세요" />),
+  'set-reacts-meme': settings('reacts', <ReactsTab reacts={M.REACT_LIST} draft="" stickers={M.STICKERS} />),
+  'set-reacts-member': settings('reacts', <ReactsTab reacts={M.REACT_LIST} draft="" readOnly />),
+  'set-stickers': settings('stickers', <StickersTab stickers={M.STICKERS} />),
   'set-log': settings('log', <LogTab entries={M.LOGS} />),
   'set-leave': settings('leave', <LeaveTab myMessages={342} myLiveCodes={1} presses={1} />),
 

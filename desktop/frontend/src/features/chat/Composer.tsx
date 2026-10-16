@@ -13,6 +13,13 @@ type Props = {
   mentionIndex?: number // 키보드로 고른 후보
   stickers?: Sticker[]
   liarLive?: string // 이 방에 열린 판이 있으면 "모이는 중 3/8 · 들어가기"
+  // 진짜 화면에서 쓰는 것 (없으면 미리보기처럼 그리기만)
+  value?: string
+  editing?: boolean // 내 메시지 고치는 중
+  onChange?: (v: string) => void
+  onSend?: () => void
+  onCancelEdit?: () => void
+  onPlus?: () => void // + 메뉴 열기·닫기
 }
 
 // + 메뉴 항목: [키, 이름, 설명, 아이콘 색, 아이콘]
@@ -26,9 +33,17 @@ const PLUS_ITEMS: [string, string, string, 'lime' | 'pink' | 'sky' | 'grape', Ic
 ]
 
 // 입력창은 [+] · 입력칸 · 보내기 세 개뿐. 나머지는 전부 + 안에 (디자인 원칙)
-export function Composer({ draft = '', popup = null, mentionCandidates = [], mentionIndex = 0, stickers = [], liarLive }: Props) {
+export function Composer({ draft = '', popup = null, mentionCandidates = [], mentionIndex = 0, stickers = [], liarLive, value, editing, onChange, onSend, onCancelEdit, onPlus }: Props) {
+  const live = onChange !== undefined
+  const text = live ? value ?? '' : draft
   return (
     <div className="composer">
+      {editing && (
+        <div className="row composer-edit">
+          <span className="grow">메시지 고치는 중 · Enter 로 저장</span>
+          <button type="button" className="btn s sec" onClick={onCancelEdit}>취소</button>
+        </div>
+      )}
       {popup === 'mention' && mentionCandidates.length > 0 && (
         <div className="popup mention" role="listbox" aria-label="흔들 사람">
           <span className="popup-title">누구를 흔들까요?</span>
@@ -51,7 +66,7 @@ export function Composer({ draft = '', popup = null, mentionCandidates = [], men
       {popup === 'plus' && (
         <div className="popup narrow" role="menu" aria-label="더하기">
           {PLUS_ITEMS.map(([key, name, desc, color, icon]) => (
-            <button key={key} type="button" role="menuitem" className="pitem plus-item">
+            <button key={key} type="button" role="menuitem" className="pitem plus-item" disabled={live} title={live ? '아직 준비 중이에요' : undefined}>
               <span className={`plus-ic ${color}`}><Icon name={icon} size={15} /></span>
               <span className="col" style={{ gap: 1 }}>
                 <span className="plus-name">{name}</span>
@@ -106,18 +121,41 @@ export function Composer({ draft = '', popup = null, mentionCandidates = [], men
           className={`btn xl-icon ${popup === 'plus' ? 'p' : 'sec'}`}
           aria-label="더하기"
           aria-expanded={popup === 'plus'}
+          onClick={onPlus}
         >
           <Icon name={popup === 'plus' ? 'x' : 'plus'} />
         </button>
         <label htmlFor="composer" className="sr">메시지</label>
-        <textarea
-          id="composer"
-          rows={1}
-          className="inp composer-input"
-          placeholder="메시지 · @ 치면 흔들기"
-          defaultValue={draft}
-        />
-        <button type="button" className="btn p xl-icon" aria-label="보내기" disabled={!draft.trim()}>
+        {live
+          ? (
+            <textarea
+              id="composer"
+              rows={1}
+              className="inp composer-input"
+              placeholder="메시지 · @전체 쓰면 다 흔들기"
+              value={text}
+              maxLength={2000}
+              autoFocus
+              onChange={(e) => onChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault()
+                  onSend?.()
+                }
+                if (e.key === 'Escape' && editing) onCancelEdit?.()
+              }}
+            />
+          )
+          : (
+            <textarea
+              id="composer"
+              rows={1}
+              className="inp composer-input"
+              placeholder="메시지 · @ 치면 흔들기"
+              defaultValue={draft}
+            />
+          )}
+        <button type="button" className="btn p xl-icon" aria-label={editing ? '저장' : '보내기'} disabled={!text.trim()} onClick={onSend}>
           <Icon name="send" />
         </button>
       </div>

@@ -13,6 +13,7 @@ export type Member = {
   dnd?: boolean // 방해 금지
   via?: string // "MK7Q2X로 들어옴", "아지트를 만듦"
   joinedAgo?: string
+  src?: string // 프사 주소
 }
 
 export type Azit = {
@@ -43,10 +44,11 @@ export type MessagePart =
   | { text: string }
   | { mention: string; mine?: boolean; shook?: boolean }
 
-export type Reaction = { label: string; img?: string; count: number; on?: boolean }
+// 메시지에 달린 맞장구 한 종류. text / memeId 는 누를 때 서버에 보낼 값
+export type Reaction = { label: string; img?: string; count: number; on?: boolean; text?: string; memeId?: number }
 
-// 이 아지트의 맞장구 하나: 글자(4자까지) 또는 짤
-export type ReactOption = { id: string; text?: string; img?: string; name?: string }
+// 이 아지트의 맞장구 하나: 글자(1~4자) 또는 짤
+export type ReactOption = { id: string; text?: string; img?: string; name?: string; memeId?: number }
 
 export type LiarCard = {
   status: 'lobby' | 'playing' | 'done' | 'cancel'
@@ -75,6 +77,9 @@ type UserBase = {
   deleted?: boolean
   shookMe?: boolean // 이 메시지로 내가 흔들렸는지
   reactions?: Reaction[]
+  edited?: boolean
+  pending?: boolean // 보내는 중
+  failed?: boolean // 못 보냄 → 다시 보내기
 }
 
 export type UserMessage = UserBase & (
@@ -100,6 +105,7 @@ export type ChatMessage = UserMessage | SystemMessage
 // cont = 같은 사람이 이어 보낸 것(아바타 생략), showTime = 묶음의 마지막이라 시간 표시.
 export type ChatRow =
   | { type: 'date'; id: string; label: string }
+  | { type: 'read'; id: string } // "여기까지 읽었어요" 선
   | { type: 'msg'; msg: ChatMessage; cont?: boolean; showTime?: boolean }
 
 /* ---------- 짤 · 알림 · 칭호 ---------- */

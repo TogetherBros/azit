@@ -1,4 +1,4 @@
-import type { ChatMessage, LiarCard, MessagePart, PollCard, ReactOption, RouletteCard, UserMessage } from '../../api/types'
+import type { ChatMessage, LiarCard, MessagePart, PollCard, Reaction, ReactOption, RouletteCard, UserMessage } from '../../api/types'
 import { Avatar } from '../../components/Avatar'
 import { Icon } from '../../components/Icon'
 
@@ -6,11 +6,17 @@ type Props = {
   msg: ChatMessage
   cont?: boolean // 같은 사람이 이어 보낸 메시지 → 아바타·이름 생략
   showTime?: boolean // 묶음의 마지막 → 시간 표시
-  reactOptions: ReactOption[] // 이 아지트의 맞장구 (최대 8개)
+  reactOptions: ReactOption[] // 이 아지트의 맞장구 (최대 10개)
+  onReact?: (msg: UserMessage, r: ReactOption) => void // 메뉴에서 맞장구 달기
+  onToggle?: (msg: UserMessage, r: Reaction) => void // 달린 맞장구 누르기 (내 거면 떼기)
+  onEdit?: (msg: UserMessage) => void
+  onDelete?: (msg: UserMessage) => void
+  onRetry?: (msg: UserMessage) => void
+  canDelete?: boolean // 남의 메시지도 지울 수 있는지 (관리자)
 }
 
 // 메시지 한 줄. 시스템 메시지(입장, 흔들기 알림)는 가운데 알약 모양.
-export function MessageItem({ msg, cont, showTime, reactOptions }: Props) {
+export function MessageItem({ msg, cont, showTime, reactOptions, onReact, onToggle, onEdit, onDelete, onRetry, canDelete }: Props) {
   if (msg.kind === 'sys') {
     return (
       <div className="sysm">
@@ -24,12 +30,12 @@ export function MessageItem({ msg, cont, showTime, reactOptions }: Props) {
   const { author, mine } = msg
 
   return (
-    <div className={`msg${mine ? ' me' : ''}`}>
+    <div className={`msg${mine ? ' me' : ''}${msg.pending ? ' pending' : ''}`}>
       {!mine && (cont
         ? <span className="msg-av-gap" />
         : (
           <button type="button" className="plain" style={{ flexShrink: 0 }} aria-label={`${author.nick} 프로필`}>
-            <Avatar name={author.nick} color={author.color} size={34} />
+            <Avatar name={author.nick} color={author.color} size={34} src={author.src} />
           </button>
         ))}
 
@@ -43,7 +49,11 @@ export function MessageItem({ msg, cont, showTime, reactOptions }: Props) {
 
         <div className="msg-line">
           <Body msg={msg} />
-          {showTime && <span className="msg-time">{msg.time}</span>}
+          {msg.failed
+            ? <button type="button" className="plain msg-failed" onClick={onRetry && (() => onRetry(msg))}>못 보냈어요 · 다시 보내기</button>
+            : (showTime || msg.edited) && (
+              <span className="msg-time">{msg.edited && '고침 '}{showTime && msg.time}</span>
+            )}
         </div>
 
         {msg.shookMe && <span className="msg-shook">나를 흔들었어요</span>}
@@ -51,7 +61,7 @@ export function MessageItem({ msg, cont, showTime, reactOptions }: Props) {
         {msg.reactions && msg.reactions.length > 0 && (
           <div className="msg-reacts">
             {msg.reactions.map((r) => (
-              <button key={r.label} type="button" className={`react${r.on ? ' on' : ''}`} aria-pressed={!!r.on} aria-label={`${r.label} ${r.count}`}>
+              <button key={r.label} type="button" className={`react${r.on ? ' on' : ''}`} aria-pressed={!!r.on} aria-label={`${r.label} ${r.count}`} title={r.img ? r.label : undefined} onClick={onToggle && (() => onToggle(msg, r))}>
                 {r.img ? <img className="rimg" src={r.img} alt="" /> : r.label} {r.count}
               </button>
             ))}
@@ -59,17 +69,18 @@ export function MessageItem({ msg, cont, showTime, reactOptions }: Props) {
         )}
       </div>
 
-      {!msg.deleted && (
+      {!msg.deleted && !msg.pending && !msg.failed && (
         <div className="acts" role="group" aria-label="맞장구">
           {reactOptions.map((r) => (
-            <button key={r.id} type="button" aria-label={r.text ?? r.name}>
+            <button key={r.id} type="button" aria-label={r.text ?? r.name} title={r.name} onClick={onReact && (() => onReact(msg, r))}>
               {r.img ? <img className="rimg" src={r.img} alt="" /> : r.text}
             </button>
           ))}
-          {(msg.kind === 'image' || msg.kind === 'sticker') && <button type="button" className="lime">짤로 저장</button>}
-          {!mine && <button type="button">흔들며 답하기</button>}
-          {mine && (msg.kind === 'text' || msg.kind === 'image' || msg.kind === 'sticker') && (
-            <button type="button" className="red">지우기</button>
+          {!onReact && (msg.kind === 'image' || msg.kind === 'sticker') && <button type="button" className="lime">짤로 저장</button>}
+          {!onReact && !mine && <button type="button">흔들며 답하기</button>}
+          {mine && onEdit && msg.kind === 'text' && <button type="button" onClick={() => onEdit(msg)}>고치기</button>}
+          {(mine || canDelete) && (msg.kind === 'text' || msg.kind === 'image' || msg.kind === 'sticker') && (
+            <button type="button" className="red" onClick={onDelete && (() => onDelete(msg))}>지우기</button>
           )}
         </div>
       )}

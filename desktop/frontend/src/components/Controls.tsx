@@ -10,13 +10,13 @@ export function Toggle({ on, label }: ToggleProps) {
   )
 }
 
-type SegProps<T extends string | number> = { label: string; value: T; options: [T, string][] }
+type SegProps<T extends string | number> = { label: string; value: T; options: [T, string][]; onChange?: (v: T) => void }
 
-export function Seg<T extends string | number>({ label, value, options }: SegProps<T>) {
+export function Seg<T extends string | number>({ label, value, options, onChange }: SegProps<T>) {
   return (
     <div className="seg" role="group" aria-label={label}>
       {options.map(([v, text]) => (
-        <button key={String(v)} type="button" className={v === value ? 'on' : ''} aria-pressed={v === value}>
+        <button key={String(v)} type="button" className={v === value ? 'on' : ''} aria-pressed={v === value} onClick={onChange && (() => onChange(v))}>
           {text}
         </button>
       ))}

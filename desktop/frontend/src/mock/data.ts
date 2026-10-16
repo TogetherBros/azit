@@ -82,6 +82,23 @@ export const REACTS: ReactOption[] = [
   { id: 'rx5', text: '최고' },
 ]
 
+// 아지트 맞장구 목록 (글자 2자 · 짤, 최대 10개)
+export const REACT_LIST: ReactOption[] = [
+  { id: 'rl1', text: 'ㅋㅋ' },
+  { id: 'rl2', text: '헐' },
+  { id: 'rl3', img: STICKERS[0].src, name: '정색' },
+  { id: 'rl4', text: '킹받네' },
+  { id: 'rl5', text: '최고' },
+  { id: 'rl6', text: 'ㅠㅠ' },
+  { id: 'rl7', img: STICKERS[4].src, name: '킹받네' },
+]
+export const REACT_LIST_FULL: ReactOption[] = [
+  ...REACT_LIST,
+  { id: 'rl8', text: 'ㄱㄱ' },
+  { id: 'rl9', text: '가보자고' },
+  { id: 'rl10', text: '🔥' },
+]
+
 const PHOTO = (() => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 180"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7BC4FF"/><stop offset="1" stop-color="#B79CFF"/></linearGradient></defs><rect width="240" height="180" fill="url(#g)"/><path d="M0 140l60-50 50 40 40-30 90 60v20H0z" fill="#2A2A34" opacity=".6"/><circle cx="185" cy="45" r="18" fill="#F4F4F6" opacity=".8"/></svg>`
   return `data:image/svg+xml,${encodeURIComponent(svg)}`

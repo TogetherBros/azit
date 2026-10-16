@@ -256,3 +256,12 @@ textarea.composer-input { resize: none; }
 .poll-bar { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(123, 196, 255, .15); }
 .poll-opt > span:not(.poll-bar) { position: relative; }
 .poll-count { font-family: var(--font-mono); font-size: 11px; }
+
+/* 진짜 채팅: 보내는 중 · 못 보냄 · 고치는 중 · 더 보기 */
+.msg.pending .bub { opacity: .55; }
+.msg-failed { font-size: 11px; font-weight: 800; color: var(--red); }
+.composer-edit { gap: 8px; margin-bottom: 8px; padding: 6px 6px 6px 12px; border-radius: 12px; background: var(--limebg); color: var(--lime); font-size: 12px; font-weight: 800; }
+.chat-more { align-self: center; margin: 8px 0; }
+.readline { display: flex; align-items: center; gap: 10px; margin: 6px 20px; font-size: 11px; font-weight: 800; color: var(--pink); }
+.readline::before, .readline::after { content: ""; flex: 1; height: 1px; background: var(--pink); opacity: .5; }
+.chat-err { margin: 6px 20px; }

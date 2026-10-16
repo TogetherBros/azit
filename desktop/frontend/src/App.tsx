@@ -7,7 +7,8 @@ import { LoginScreen } from './features/auth/LoginScreen'
 type Phase = 'checking' | 'out' | 'waiting' | 'in'
 
 // 로그인 전이면 LoginScreen, 로그인하면 본 화면.
-// 본 화면은 아직 프로필 만들기·내 정보(MeScreen)만 진짜다. 디자인 미리보기는 dev/Preview.tsx.
+// 본 화면(MeScreen)은 프로필·홈·아지트 만들기·코드로 들어가기·채팅·아지트 설정(초대 코드·방·맞장구·짤)이 진짜 서버와 이어져 있다.
+// 놀이터·알림·멤버 관리처럼 서버 API 가 아직 없는 화면은 디자인 미리보기(dev/Preview.tsx)에만 있다.
 export default function App() {
   const [phase, setPhase] = useState<Phase>('checking')
   const [error, setError] = useState<string>()

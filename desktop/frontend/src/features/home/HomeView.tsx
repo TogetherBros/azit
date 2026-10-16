@@ -1,5 +1,6 @@
 import type { Azit } from '../../api/types'
 import { Icon } from '../../components/Icon'
+import { Mark } from '../../components/Mark'
 
 // 홈에서 보여 줄 아지트 한 칸. 레일에 있는 것보다 조금 더 안다.
 export type HomeAzit = Azit & {
@@ -9,17 +10,32 @@ export type HomeAzit = Azit & {
   live?: string // 열려 있는 판 "라이어 판 모이는 중"
 }
 
+// 코드를 확인하면 들어가기 전에 보여 줄 아지트
+export type JoinPreview = { name: string; short: string; color: string; banner?: string; memberCount: number; inviter: string; already: boolean }
+
 type Props = {
   nickname: string
   azits: HomeAzit[]
   code?: string // 코드 칸에 쳐 둔 것
   codeError?: string
+  preview?: JoinPreview
+  busy?: boolean
+  onCode?: (code: string) => void
+  onCheck?: () => void // 코드 확인
+  onJoin?: () => void // 미리보기에서 들어가기
+  onCancelJoin?: () => void
+  onOpen?: (id: string) => void
+  onCreate?: () => void
 }
+
+// 초대 코드는 8자리 (보여 줄 땐 XXXX-XXXX). 하이픈·공백은 빼고 센다.
+export const codeLength = (code: string) => code.replace(/[^0-9A-Za-z]/g, '').length
 
 // 로그인하고 처음 보는 화면 (디스코드 홈처럼).
 // 들어가 있는 아지트를 카드(배너 · 이름 · 인원)로 2x2 씩 보여 주고 넘치면 스크롤. 오른쪽엔 코드로 들어가기 · 새로 만들기.
 // 아지트가 하나도 없으면 가운데에 코드 칸만 크게.
-export function HomeView({ nickname, azits, code = '', codeError }: Props) {
+export function HomeView(props: Props) {
+  const { nickname, azits } = props
   if (azits.length === 0) {
     return (
       <div className="main">
@@ -29,7 +45,7 @@ export function HomeView({ nickname, azits, code = '', codeError }: Props) {
             <p className="mu" style={{ textAlign: 'center', lineHeight: 1.6 }}>
               아직 들어간 아지트가 없어요.<br />친구한테 받은 초대 코드를 넣거나, 우리 아지트를 새로 만들어요.
             </p>
-            <JoinCard code={code} error={codeError} big />
+            <JoinCard {...props} big />
           </div>
         </div>
       </div>
@@ -48,21 +64,21 @@ export function HomeView({ nickname, azits, code = '', codeError }: Props) {
             </span>
           </div>
           <div className="home-grid">
-            {azits.map((a) => <AzitCard key={a.id} a={a} />)}
+            {azits.map((a) => <AzitCard key={a.id} a={a} onOpen={props.onOpen} />)}
           </div>
         </section>
 
         <aside className="home-side">
-          <JoinCard code={code} error={codeError} />
+          <JoinCard {...props} />
         </aside>
       </div>
     </div>
   )
 }
 
-function AzitCard({ a }: { a: HomeAzit }) {
+function AzitCard({ a, onOpen }: { a: HomeAzit; onOpen?: (id: string) => void }) {
   return (
-    <button type="button" className="home-azit" aria-label={`${a.name} 들어가기`}>
+    <button type="button" className="home-azit" aria-label={`${a.name} 들어가기`} onClick={onOpen && (() => onOpen(a.id))}>
       <span className="home-azit-banner" style={{ background: a.color }}>
         {a.banner
           ? <img src={a.banner} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />
@@ -80,28 +96,51 @@ function AzitCard({ a }: { a: HomeAzit }) {
   )
 }
 
-// 초대 코드 6자리 칸 + 새 아지트 만들기
-function JoinCard({ code, error, big }: { code: string; error?: string; big?: boolean }) {
+// 초대 코드 칸 + 새 아지트 만들기. 코드를 확인하면 그 자리에 아지트 미리보기가 뜬다.
+function JoinCard({ code = '', codeError, preview, busy, onCode, onCheck, onJoin, onCancelJoin, onCreate, big }: Props & { big?: boolean }) {
+  if (preview) {
+    return (
+      <div className={`card col home-join${big ? ' big' : ''}`}>
+        <span className="b">이 아지트에 들어갈까요?</span>
+        <div className="row join-prev">
+          <Mark label={preview.short} color={preview.color} size="md" />
+          <div className="grow col" style={{ gap: 3 }}>
+            <span className="join-prev-name ell">{preview.name}</span>
+            <span className="mu" style={{ fontSize: 12 }}>{preview.memberCount}명 · {preview.inviter}님이 초대했어요</span>
+          </div>
+        </div>
+        {codeError && <span role="alert" className="ferr">{codeError}</span>}
+        <button type="button" className="btn p" disabled={busy} onClick={onJoin}>
+          {preview.already ? '이미 들어가 있어요 · 열기' : busy ? '들어가는 중…' : '들어가기'}
+        </button>
+        <button type="button" className="btn sec" disabled={busy} onClick={onCancelJoin}>다른 코드</button>
+      </div>
+    )
+  }
+
+  const ready = codeLength(code) === 8
   return (
     <div className={`card col home-join${big ? ' big' : ''}`}>
-      <form className="col" style={{ gap: 10 }} noValidate onSubmit={(e) => e.preventDefault()}>
+      <form className="col" style={{ gap: 10 }} noValidate onSubmit={(e) => { e.preventDefault(); if (ready && !busy) onCheck?.() }}>
         <label htmlFor="home-code" className="b">초대 코드로 들어가기</label>
         <input
           id="home-code"
-          className={`inp code-input${big ? '' : ' sm'}${error ? ' err' : ''}`}
-          maxLength={6}
+          className={`inp code-input${big ? '' : ' sm'}${codeError ? ' err' : ''}`}
+          maxLength={9}
           autoComplete="off"
           spellCheck={false}
-          placeholder="MK7Q2X"
-          defaultValue={code}
+          placeholder="ABCD-EFGH"
+          value={code}
+          onChange={onCode && ((e) => onCode(e.target.value.toUpperCase()))}
+          readOnly={!onCode}
         />
-        {error
-          ? <span role="alert" className="ferr">{error}</span>
-          : <span className="hint">아지트 안 친구가 준 6자리예요</span>}
-        <button type="submit" className="btn p" disabled={code.length !== 6}>확인</button>
+        {codeError
+          ? <span role="alert" className="ferr">{codeError}</span>
+          : <span className="hint">아지트 안 친구가 준 8자리예요</span>}
+        <button type="submit" className="btn p" disabled={!ready || busy}>{busy ? '확인하는 중…' : '확인'}</button>
       </form>
       <div className="home-or"><span>또는</span></div>
-      <button type="button" className="btn gh">
+      <button type="button" className="btn gh" onClick={onCreate}>
         <Icon name="plus" />
         새 아지트 만들기
       </button>

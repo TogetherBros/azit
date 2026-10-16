@@ -12,10 +12,12 @@ type Props = {
   meSrc?: string // 내 프사 주소
   onHome?: () => void
   onMe?: () => void
+  onAzit?: (id: string) => void
+  onAdd?: () => void // + : 코드로 들어가기 · 새 아지트 (홈으로 간다)
 }
 
 // 왼쪽 세로 줄: 로고(= 홈) · 내 아지트들 · [+] · (아래) 알림 · 앱 설정 · 내 정보
-export function Rail({ azits, currentId, me, notifCount, view, meSrc, onHome, onMe }: Props) {
+export function Rail({ azits, currentId, me, notifCount, view, meSrc, onHome, onMe, onAzit, onAdd }: Props) {
   return (
     <nav className="rail" aria-label="아지트 목록">
       <button
@@ -38,6 +40,8 @@ export function Rail({ azits, currentId, me, notifCount, view, meSrc, onHome, on
             style={on ? { background: az.color } : undefined}
             aria-label={az.name + (az.unread ? ` 새 메시지 ${az.unread}개` : '')}
             aria-current={on}
+            title={az.name}
+            onClick={onAzit && (() => onAzit(az.id))}
           >
             {az.short}
             {az.unread > 0 && !on && <span className="badge">{az.unread > 99 ? '99+' : az.unread}</span>}
@@ -45,7 +49,7 @@ export function Rail({ azits, currentId, me, notifCount, view, meSrc, onHome, on
         )
       })}
 
-      <button type="button" className="rbtn add" aria-label="코드로 들어가기 또는 새 아지트">
+      <button type="button" className="rbtn add" aria-label="코드로 들어가기 또는 새 아지트" onClick={onAdd}>
         <Icon name="plus" />
       </button>
 
