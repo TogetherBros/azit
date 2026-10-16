@@ -10,6 +10,7 @@ import (
 	"github.com/TogetherBros/azit/server/internal/member"
 	"github.com/TogetherBros/azit/server/internal/meme"
 	"github.com/TogetherBros/azit/server/internal/message"
+	"github.com/TogetherBros/azit/server/internal/notification"
 	"github.com/TogetherBros/azit/server/internal/profile"
 	"github.com/TogetherBros/azit/server/internal/room"
 	"github.com/TogetherBros/azit/server/internal/storage"
@@ -29,6 +30,7 @@ type handlers struct {
 	message *message.Handler
 	meme    *meme.Handler
 	member  *member.Handler
+	notif   *notification.Handler
 
 	// requireMember 는 /v1/azits/{id}/... 경로에 끼우는 아지트 멤버 확인 미들웨어.
 	requireMember fiber.Handler
@@ -62,6 +64,7 @@ func newHandlers(cfg config.Config, conn *gorm.DB, tokenProvider *auth.TokenProv
 		message: message.NewHandler(messageRepo, roomRepo, memberRepo, accountRepo, memeRepo, r2),
 		meme:    meme.NewHandler(memeRepo, r2),
 		member:  member.NewHandler(memberRepo, accountRepo, r2),
+		notif:   notification.NewHandler(notification.NewRepository(conn)),
 
 		requireMember: member.RequireMember(memberRepo),
 	}, nil

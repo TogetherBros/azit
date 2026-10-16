@@ -139,7 +139,7 @@ func (h *Handler) Kick(c fiber.Ctx) error {
 		return forbidden("나보다 역할이 낮은 사람만 내보낼 수 있어요")
 	}
 
-	if err := h.memberRepo.Leave(c.Context(), me.AzitID, target.AccountID, time.Now()); err != nil {
+	if err := h.memberRepo.Kick(c.Context(), me, target.AccountID, time.Now()); err != nil {
 		return err
 	}
 	return c.SendStatus(fiber.StatusNoContent)
@@ -183,9 +183,14 @@ func (h *Handler) toResponses(ctx context.Context, members []Member) ([]proto.Me
 	res := make([]proto.MemberResponse, 0, len(members))
 	for _, m := range members {
 		acc := accounts[m.AccountID]
-		avatarURL := ""
+		avatarURL, bannerURL := "", ""
 		if acc.AvatarKey != "" {
 			if avatarURL, err = h.r2.PresignGet(ctx, acc.AvatarKey); err != nil {
+				return nil, err
+			}
+		}
+		if acc.BannerKey != "" {
+			if bannerURL, err = h.r2.PresignGet(ctx, acc.BannerKey); err != nil {
 				return nil, err
 			}
 		}
@@ -199,6 +204,7 @@ func (h *Handler) toResponses(ctx context.Context, members []Member) ([]proto.Me
 			Nickname:  m.NickName,
 			Color:     acc.Color,
 			AvatarURL: avatarURL,
+			BannerURL: bannerURL,
 			Bio:       acc.Bio,
 			Role:      string(m.Role),
 			JoinedAt:  m.JoinedAt,

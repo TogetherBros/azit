@@ -130,6 +130,7 @@ func (h *Handler) List(c fiber.Ctx) error {
 			AzitID:      a.AzitID,
 			Name:        a.Name,
 			Color:       a.Color,
+			Description: a.Description,
 			BannerURL:   bannerURL,
 			MemberCount: counts[a.AzitID],
 			MyRole:      string(me.Role),
@@ -149,7 +150,70 @@ func (h *Handler) bannerURL(ctx context.Context, key string) (string, error) {
 }
 
 // Routes 는 /v1/azits 아래 경로를 붙인다. r 에는 인증 미들웨어가 걸려 있어야 한다.
-func (h *Handler) Routes(r fiber.Router) {
+// requireMember 는 /:id 경로에 끼우는 아지트 멤버 확인 미들웨어.
+func (h *Handler) Routes(r fiber.Router, requireMember fiber.Handler) {
 	r.Post("/", h.Create)
 	r.Get("/", h.List)
+	r.Patch("/:id", requireMember, h.Update)
+}
+
+// Update 는 아지트 기본 정보(이름, 색, 소개, 배너)를 바꾼다. 관리자 이상만. PATCH /v1/azits/{id}
+// 보낸 칸만 바꾸고, 바뀐 아지트를 목록과 같은 모양으로 돌려준다.
+func (h *Handler) Update(c fiber.Ctx) error {
+	ctx := c.Context()
+	me := member.Current(c)
+	if !me.Role.AtLeast(member.RoleAdmin) {
+		return httperr.New(fiber.StatusForbidden, proto.ErrCodeForbidden, "관리자만 바꿀 수 있어요")
+	}
+
+	var req proto.UpdateAzitRequest
+	if err := c.Bind().JSON(&req); err != nil {
+		return fiber.ErrBadRequest
+	}
+	input := UpdateInput{Name: req.Name, Color: req.Color, Description: req.Description, BannerKey: req.BannerKey}
+	input.Normalize()
+	if err := input.Validate(); err != nil {
+		return httperr.New(fiber.StatusBadRequest, proto.ErrCodeBadRequest, err.Error())
+	}
+
+	// 새 배너는 내가 올린 아지트 배너여야 하고, R2 에 다 올라가 있어야 한다. "" 는 배너 지우기
+	if input.BannerKey != nil && *input.BannerKey != "" {
+		key := *input.BannerKey
+		if !storage.OwnedBy(key, storage.KindAzitBanner, me.AccountID) {
+			return httperr.New(fiber.StatusBadRequest, proto.ErrCodeBadRequest, "내 사진이 아니에요")
+		}
+		if _, _, err := h.r2.Head(ctx, key); err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return httperr.New(fiber.StatusBadRequest, proto.ErrCodeBadRequest, "업로드가 아직 안 끝났어요")
+			}
+			return err
+		}
+	}
+
+	if err := h.azitRepo.Update(ctx, me.AzitID, input.Changes()); err != nil {
+		return err
+	}
+
+	a, err := h.azitRepo.FindByID(ctx, me.AzitID)
+	if err != nil {
+		return err
+	}
+	counts, err := h.memberRepo.CountActive(ctx, []int64{a.AzitID})
+	if err != nil {
+		return err
+	}
+	bannerURL, err := h.bannerURL(ctx, a.BannerKey)
+	if err != nil {
+		return err
+	}
+	return c.JSON(proto.AzitResponse{
+		AzitID:      a.AzitID,
+		Name:        a.Name,
+		Color:       a.Color,
+		Description: a.Description,
+		BannerURL:   bannerURL,
+		MemberCount: counts[a.AzitID],
+		MyRole:      string(me.Role),
+		MyNickname:  me.NickName,
+	})
 }

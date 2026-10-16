@@ -9,6 +9,7 @@ type MemberResponse struct {
 	Nickname  string    `json:"nickname"`   // 이 아지트 안 닉네임
 	Color     string    `json:"color"`      // 계정 색
 	AvatarURL string    `json:"avatar_url"` // R2 보기 링크. 없으면 ""
+	BannerURL string    `json:"banner_url"` // 프로필 배너 R2 보기 링크. 없으면 ""
 	Bio       string    `json:"bio"`
 	Role      string    `json:"role"` // super_admin, admin, member
 	JoinedAt  time.Time `json:"joined_at"`

@@ -303,6 +303,7 @@ func (h *Handler) azitResponse(ctx context.Context, a azit.Azit) (proto.AzitResp
 		AzitID:      a.AzitID,
 		Name:        a.Name,
 		Color:       a.Color,
+		Description: a.Description,
 		BannerURL:   bannerURL,
 		MemberCount: counts[a.AzitID],
 	}, nil

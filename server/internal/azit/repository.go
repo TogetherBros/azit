@@ -43,6 +43,14 @@ func (r *Repository) FindMyAzits(ctx context.Context, accountID int64) ([]Azit, 
 	return azits, err
 }
 
+// Update 는 아지트 칸 몇 개를 바꾼다. changes 는 UpdateInput.Changes() 결과.
+func (r *Repository) Update(ctx context.Context, id int64, changes map[string]any) error {
+	if len(changes) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Model(&Azit{}).Where("azit_id = ?", id).Updates(changes).Error
+}
+
 type CreateInput struct {
 	MasterID  int64
 	Nickname  string // 만든 사람의 계정 닉네임. 아지트 안 닉네임으로 복사해 둔다

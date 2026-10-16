@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/TogetherBros/azit/server/internal/notification"
 	"gorm.io/gorm"
 )
 
@@ -112,6 +113,26 @@ func (r *Repository) UpdateRole(ctx context.Context, azitID, accountID int64, ro
 	return r.db.WithContext(ctx).Model(&Member{}).
 		Where("azit_id = ? AND account_id = ? AND left_at IS NULL", azitID, accountID).
 		Update("role", role).Error
+}
+
+// Kick 은 멤버를 내보내고, 내보내진 사람에게 알림을 남긴다. 한 트랜잭션.
+// kicker 는 내보낸 사람 (알림에 "누가" 로 남는다).
+func (r *Repository) Kick(ctx context.Context, kicker Member, targetID int64, at time.Time) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		err := tx.Model(&Member{}).
+			Where("azit_id = ? AND account_id = ? AND left_at IS NULL", kicker.AzitID, targetID).
+			Update("left_at", at).Error
+		if err != nil {
+			return err
+		}
+		return notification.Insert(tx, []notification.Notification{{
+			AccountID: targetID,
+			Kind:      notification.KindKick,
+			AzitID:    kicker.AzitID,
+			ActorID:   kicker.AccountID,
+			ActorNick: kicker.NickName,
+		}})
+	})
 }
 
 // Leave 는 멤버를 나간 상태로 만든다 (스스로 나가기, 내보내기 둘 다). 줄은 지우지 않는다:

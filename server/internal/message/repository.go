@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/TogetherBros/azit/server/internal/notification"
 	"gorm.io/gorm"
 )
 
@@ -19,11 +20,19 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-// Create 는 메시지와 @로 부른 사람(Shake)들을 한 트랜잭션으로 저장한다.
+// Create 는 메시지와 @로 부른 사람(Shake)들, 흔들기 알림들을 한 트랜잭션으로 저장한다.
 // 성공하면 m.MessageID, m.CreatedAt 이 채워진다. shakeIDs 중복 제거는 부르는 쪽에서 한다.
-func (r *Repository) Create(ctx context.Context, m *Message, shakeIDs []int64) error {
+// notes 의 MessageID 는 여기서 채운다 (저장하기 전엔 메시지 id 를 모르니까).
+func (r *Repository) Create(ctx context.Context, m *Message, shakeIDs []int64, notes []notification.Notification) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(m).Error; err != nil {
+			return err
+		}
+
+		for i := range notes {
+			notes[i].MessageID = m.MessageID
+		}
+		if err := notification.Insert(tx, notes); err != nil {
 			return err
 		}
 

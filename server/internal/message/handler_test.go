@@ -12,22 +12,28 @@ import (
 	"github.com/TogetherBros/azit/proto"
 	"github.com/TogetherBros/azit/server/internal/account"
 	"github.com/TogetherBros/azit/server/internal/auth"
+	"github.com/TogetherBros/azit/server/internal/azit"
 	"github.com/TogetherBros/azit/server/internal/db"
 	"github.com/TogetherBros/azit/server/internal/httperr"
 	"github.com/TogetherBros/azit/server/internal/member"
 	"github.com/TogetherBros/azit/server/internal/meme"
+	"github.com/TogetherBros/azit/server/internal/notification"
 	"github.com/TogetherBros/azit/server/internal/room"
 	"github.com/TogetherBros/azit/server/internal/storage"
 	"github.com/gofiber/fiber/v3"
+	"gorm.io/gorm"
 )
 
 // sendEnv 는 메시지 보내기 테스트용 서버. 아지트 1 에 멤버 한 명, 방 하나, 짤 하나가 있다.
 type sendEnv struct {
-	app    *fiber.App
-	token  string
-	roomID int64
-	memeID int64 // 아지트 1 짤
-	other  int64 // 아지트 2 짤
+	db       *gorm.DB
+	app      *fiber.App
+	token    string
+	roomID   int64
+	memeID   int64 // 아지트 1 짤
+	other    int64 // 아지트 2 짤
+	friend   int64 // 아지트 1 의 다른 멤버 (@로 부를 수 있음)
+	outsider int64 // 아지트 2 에만 있는 사람 (@로 부를 수 없음)
 }
 
 func newSendEnv(t *testing.T) sendEnv {
@@ -41,13 +47,20 @@ func newSendEnv(t *testing.T) sendEnv {
 	sqlDB, _ := conn.DB()
 	t.Cleanup(func() { sqlDB.Close() })
 
-	if err := conn.AutoMigrate(&account.Account{}, &member.Member{}, &room.Room{}, &Message{}, &Read{}, &Shake{}, &Reaction{}, &meme.Meme{}); err != nil {
+	if err := conn.AutoMigrate(&account.Account{}, &member.Member{}, &room.Room{}, &Message{}, &Read{}, &Shake{}, &Reaction{}, &meme.Meme{}, &notification.Notification{}, &azit.Azit{}); err != nil {
 		t.Fatalf("AutoMigrate 실패: %v", err)
 	}
 
 	acc := account.Account{Provider: account.ProviderGoogle, Subject: "sub-1", Email: "a@test.com", Nickname: "문경"}
 	must(t, conn.Create(&acc).Error)
 	must(t, conn.Create(&member.Member{AzitID: 1, AccountID: acc.ID, NickName: "문경", Role: member.RoleMember}).Error)
+
+	friend := account.Account{Provider: account.ProviderGoogle, Subject: "sub-2", Email: "b@test.com", Nickname: "백호"}
+	outsider := account.Account{Provider: account.ProviderGoogle, Subject: "sub-3", Email: "c@test.com", Nickname: "남"}
+	must(t, conn.Create(&friend).Error)
+	must(t, conn.Create(&outsider).Error)
+	must(t, conn.Create(&member.Member{AzitID: 1, AccountID: friend.ID, NickName: "백호", Role: member.RoleMember}).Error)
+	must(t, conn.Create(&member.Member{AzitID: 2, AccountID: outsider.ID, NickName: "남", Role: member.RoleMember}).Error)
 
 	roomRepo := room.NewRepository(conn)
 	rm := room.Room{AzitID: 1, Name: "아지트", CreatedBy: acc.ID}
@@ -71,7 +84,7 @@ func newSendEnv(t *testing.T) sendEnv {
 	app := fiber.New(fiber.Config{ErrorHandler: httperr.Handler}) // 실제 서버처럼 httperr 를 상태 코드로
 	h.Routes(app.Group("/v1/azits", auth.RequireAuth(p)), member.RequireMember(memberRepo))
 
-	return sendEnv{app: app, token: token, roomID: rm.RoomID, memeID: mine.MemeID, other: other.MemeID}
+	return sendEnv{db: conn, app: app, token: token, roomID: rm.RoomID, memeID: mine.MemeID, other: other.MemeID, friend: friend.ID, outsider: outsider.ID}
 }
 
 func must(t *testing.T, err error) {
@@ -154,5 +167,68 @@ func TestSendMessage_TextStillWorks(t *testing.T) {
 	}
 	if m.Kind != "text" || m.Body != "안녕" || m.MediaURL != "" {
 		t.Errorf("got kind %q body %q media_url %q", m.Kind, m.Body, m.MediaURL)
+	}
+}
+
+func TestSendMessage_Shake(t *testing.T) {
+	e := newSendEnv(t)
+
+	// 같은 사람을 두 번 불러도 한 번으로
+	status, m := e.send(t, proto.SendMessageRequest{TempID: "s-1", Body: "@백호 점심", ShakeIDs: []int64{e.friend, e.friend}})
+	if status != 201 {
+		t.Fatalf("status = %d, want 201", status)
+	}
+	if len(m.ShakeIDs) != 1 || m.ShakeIDs[0] != e.friend {
+		t.Errorf("shake_ids = %v, want [%d]", m.ShakeIDs, e.friend)
+	}
+
+	// 다른 아지트 사람은 못 부른다
+	if status, _ := e.send(t, proto.SendMessageRequest{TempID: "s-2", Body: "@남", ShakeIDs: []int64{e.outsider}}); status != 400 {
+		t.Errorf("아지트 밖 사람: status = %d, want 400", status)
+	}
+
+	// @전체
+	status, m = e.send(t, proto.SendMessageRequest{TempID: "s-3", Body: "@전체 모여", ShakeAll: true})
+	if status != 201 || !m.ShakeAll {
+		t.Errorf("@전체: status %d, shake_all %v", status, m.ShakeAll)
+	}
+}
+
+// 흔들면 흔들린 사람에게 알림이 남는다. @전체 는 나 빼고 전원, 나를 부른 건 알림 안 남김.
+func TestSendMessage_ShakeNotifications(t *testing.T) {
+	e := newSendEnv(t)
+	count := func(accountID int64) int64 {
+		var n int64
+		e.db.Model(&notification.Notification{}).Where("account_id = ?", accountID).Count(&n)
+		return n
+	}
+
+	if status, _ := e.send(t, proto.SendMessageRequest{TempID: "n-1", Body: "@백호 점심", ShakeIDs: []int64{e.friend}}); status != 201 {
+		t.Fatalf("status = %d", status)
+	}
+	if count(e.friend) != 1 {
+		t.Errorf("@백호: 백호 알림 %d, want 1", count(e.friend))
+	}
+
+	if status, _ := e.send(t, proto.SendMessageRequest{TempID: "n-2", Body: "@전체 모여", ShakeAll: true}); status != 201 {
+		t.Fatalf("status = %d", status)
+	}
+	if count(e.friend) != 2 {
+		t.Errorf("@전체: 백호 알림 %d, want 2", count(e.friend))
+	}
+	if count(e.outsider) != 0 {
+		t.Errorf("다른 아지트 사람에게 알림이 감: %d", count(e.outsider))
+	}
+
+	var me int64
+	e.db.Model(&notification.Notification{}).Where("actor_id = account_id").Count(&me)
+	if me != 0 {
+		t.Errorf("나에게 간 알림 %d, want 0", me)
+	}
+
+	var n notification.Notification
+	e.db.Where("account_id = ?", e.friend).First(&n)
+	if n.Kind != notification.KindShake || n.RoomName != "아지트" || n.Preview != "@백호 점심" || n.ActorNick != "문경" {
+		t.Errorf("알림 = %+v", n)
 	}
 }

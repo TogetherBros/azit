@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/TogetherBros/azit/server/internal/member"
+	"github.com/TogetherBros/azit/server/internal/notification"
 	"gorm.io/gorm"
 )
 
@@ -83,6 +84,29 @@ func (r *Repository) Revoke(ctx context.Context, inviteID int64, now time.Time) 
 		Update("revoked_at", now).Error
 }
 
+// notifyJoin 은 원래 있던 멤버들(들어온 사람 빼고)에게 "누가 들어왔어요" 알림을 남긴다. Join 트랜잭션 안에서 부른다.
+func notifyJoin(tx *gorm.DB, azitID, joinerID int64, nickname string) error {
+	var ids []int64
+	err := tx.Model(&member.Member{}).
+		Where("azit_id = ? AND left_at IS NULL AND account_id <> ?", azitID, joinerID).
+		Pluck("account_id", &ids).Error
+	if err != nil {
+		return err
+	}
+
+	notes := make([]notification.Notification, 0, len(ids))
+	for _, id := range ids {
+		notes = append(notes, notification.Notification{
+			AccountID: id,
+			Kind:      notification.KindJoin,
+			AzitID:    azitID,
+			ActorID:   joinerID,
+			ActorNick: nickname,
+		})
+	}
+	return notification.Insert(tx, notes)
+}
+
 // JoinInput 은 초대 코드로 들어올 때 필요한 값.
 type JoinInput struct {
 	Code      string // NormalizeCode 를 거친 값
@@ -136,7 +160,7 @@ func (r *Repository) Join(ctx context.Context, in JoinInput) (int64, error) {
 
 		if found {
 			// 나갔다 다시 들어오는 사람: 새 줄 대신 기존 줄을 살린다. 역할은 일반으로 되돌린다.
-			return tx.Model(&member.Member{}).
+			err = tx.Model(&member.Member{}).
 				Where("azit_id = ? AND account_id = ?", inv.AzitID, in.AccountID).
 				Updates(map[string]any{
 					"left_at":     nil,
@@ -145,15 +169,20 @@ func (r *Repository) Join(ctx context.Context, in JoinInput) (int64, error) {
 					"nick_name":   in.Nickname,
 					"invite_code": inv.Code,
 				}).Error
+		} else {
+			err = tx.Create(&member.Member{
+				AzitID:     inv.AzitID,
+				AccountID:  in.AccountID,
+				NickName:   in.Nickname,
+				Role:       member.RoleMember,
+				InviteCode: inv.Code,
+			}).Error
+		}
+		if err != nil {
+			return err
 		}
 
-		return tx.Create(&member.Member{
-			AzitID:     inv.AzitID,
-			AccountID:  in.AccountID,
-			NickName:   in.Nickname,
-			Role:       member.RoleMember,
-			InviteCode: inv.Code,
-		}).Error
+		return notifyJoin(tx, inv.AzitID, in.AccountID, in.Nickname)
 	})
 
 	return azitID, err

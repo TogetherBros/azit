@@ -28,13 +28,14 @@ func newApp(cfg config.Config, h *handlers, tokenProvider *auth.TokenProvider) *
 	h.upload.Routes(api.Group("/uploads", requireAuth))
 	h.profile.Routes(api.Group("/me", requireAuth))
 	azits := api.Group("/azits", requireAuth)
-	h.azit.Routes(azits)
+	h.azit.Routes(azits, h.requireMember)
 	h.invite.AzitRoutes(azits)
 	h.room.Routes(azits, h.requireMember)
 	h.message.Routes(azits, h.requireMember)
 	h.meme.Routes(azits, h.requireMember)
 	h.member.Routes(azits, h.requireMember)
 	h.invite.Routes(api.Group("/invites", requireAuth))
+	h.notif.Routes(api.Group("/notifications", requireAuth))
 
 	if cfg.Dev {
 		app.Get("/dev/token", h.auth.DevToken)

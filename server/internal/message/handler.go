@@ -9,6 +9,7 @@ import (
 	"github.com/TogetherBros/azit/server/internal/httperr"
 	"github.com/TogetherBros/azit/server/internal/member"
 	"github.com/TogetherBros/azit/server/internal/meme"
+	"github.com/TogetherBros/azit/server/internal/notification"
 	"github.com/TogetherBros/azit/server/internal/room"
 	"github.com/TogetherBros/azit/server/internal/storage"
 	"github.com/gofiber/fiber/v3"
@@ -126,7 +127,11 @@ func (h *Handler) SendMessage(c fiber.Ctx) error {
 		ReplyToID: req.ReplyToID,
 		ShakeAll:  req.ShakeAll,
 	}
-	if err := h.repo.Create(ctx, &m, shakeIDs); err != nil {
+	notes, err := h.shakeNotes(c, me, rm, m, shakeIDs)
+	if err != nil {
+		return err
+	}
+	if err := h.repo.Create(ctx, &m, shakeIDs, notes); err != nil {
 		return err
 	}
 
@@ -136,6 +141,40 @@ func (h *Handler) SendMessage(c fiber.Ctx) error {
 	}
 
 	return h.respondOne(c, fiber.StatusCreated, me, m)
+}
+
+// shakeNotes 는 흔들린 사람마다 알림 한 줄씩 만든다. @전체 면 나 빼고 지금 멤버 전부, 아니면 @로 부른 사람들 (나는 빼고).
+// 아지트·방 이름은 notification.Insert 가 채운다.
+func (h *Handler) shakeNotes(c fiber.Ctx, me member.Member, rm room.Room, m Message, shakeIDs []int64) ([]notification.Notification, error) {
+	targets := shakeIDs
+	if m.ShakeAll {
+		members, err := h.memberRepo.ListActive(c.Context(), me.AzitID)
+		if err != nil {
+			return nil, err
+		}
+		targets = make([]int64, 0, len(members))
+		for _, mm := range members {
+			targets = append(targets, mm.AccountID)
+		}
+		targets = UniqueIDs(append(targets, shakeIDs...))
+	}
+
+	notes := make([]notification.Notification, 0, len(targets))
+	for _, id := range targets {
+		if id == me.AccountID {
+			continue
+		}
+		notes = append(notes, notification.Notification{
+			AccountID: id,
+			Kind:      notification.KindShake,
+			AzitID:    me.AzitID,
+			RoomID:    rm.RoomID,
+			ActorID:   me.AccountID,
+			ActorNick: me.NickName,
+			Preview:   m.Body,
+		})
+	}
+	return notes, nil
 }
 
 // content 는 요청 종류에 따라 저장할 종류, 본문, 짤 id 를 정한다.
