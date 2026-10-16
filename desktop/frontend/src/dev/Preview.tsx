@@ -217,7 +217,7 @@ const SCREENS: Record<string, () => ReactNode> = {
     <GeneralTab azit={AZ} rooms={M.ROOMS} landingId="r1" welcome lastChange="" dirty error="이름은 10분에 한 번 바꿀 수 있어요 · 7분 뒤에" />
   )),
   'set-codes': settings('codes', <CodesTab codes={M.CODES} made={{ code: 'Q9WE2R', left: '24시간 남음', uses: '5번' }} />),
-  'set-members': settings('members', <MembersTab members={M.MEMBERS} meId={M.ME.id} bans={[{ id: 'ex01', name: '권재현' }]} />),
+  'set-members': settings('members', <MembersTab members={M.MEMBERS.map((m, i) => ({ ...m, name: m.id, role: i === 0 ? 'super_admin' : i === 2 ? 'admin' : 'member' }))} meId={M.ME.id} myRole="super_admin" />),
   'set-rooms': settings('rooms', (
     <RoomsTab rooms={M.ROOMS} archived={['테스트ㅋㅋ']} selectedId="r3" selectedInfo="류승엽이 만듦 · 2주 전 · 메시지 54개" />
   )),
@@ -230,7 +230,7 @@ const SCREENS: Record<string, () => ReactNode> = {
   'set-reacts-member': settings('reacts', <ReactsTab reacts={M.REACT_LIST} draft="" readOnly />),
   'set-stickers': settings('stickers', <StickersTab stickers={M.STICKERS} />),
   'set-log': settings('log', <LogTab entries={M.LOGS} />),
-  'set-leave': settings('leave', <LeaveTab myMessages={342} myLiveCodes={1} presses={1} />),
+  'set-leave': settings('leave', <LeaveTab presses={1} />),
 
   // 작게 보기
   'mini': () => (

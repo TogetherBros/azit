@@ -173,6 +173,8 @@ export function MeScreen({ onLogout }: Props) {
         azit={inside}
         me={{ id: me.account_id, nick: inside.my_nickname || me.nickname, color: me.color, src: profile.avatarSrc }}
         onBack={() => { setView('home'); void loadAzits() }}
+        onChanged={() => void loadAzits()}
+        onLeft={() => { setAzits((as) => as.filter((x) => x.azit_id !== inside.azit_id)); setView('home'); void loadAzits() }}
       />
     )
   }

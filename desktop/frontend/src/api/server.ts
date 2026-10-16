@@ -72,6 +72,10 @@ export type ReactRes = { react_id: number; text: string; meme_id: number; meme_u
 // 맞장구 하나 (글자 또는 짤). 달기·떼기·목록 칸 공통
 export type ReactItem = { text: string; meme_id: number }
 
+export type MemberRes = {
+  account_id: number; name: string; nickname: string; color: string; avatar_url: string; bio: string; role: Role; joined_at: string
+}
+
 /* ---------- 아지트 · 초대 ---------- */
 
 export const listAzits = () => call<AzitRes[]>('GET', '/v1/azits')
@@ -129,6 +133,19 @@ export const removeReaction = (azitId: number, messageId: number, r: ReactItem) 
   call<ReactionRes[]>('DELETE', `/v1/azits/${azitId}/messages/${messageId}/reactions`, r)
 
 /* ---------- 짤 · 맞장구 목록 ---------- */
+
+// 멤버
+export const listMembers = (azitId: number) => call<MemberRes[]>('GET', `/v1/azits/${azitId}/members`)
+
+export const updateMyNickname = (azitId: number, nickname: string) =>
+  call<MemberRes>('PATCH', `/v1/azits/${azitId}/members/me`, { nickname })
+
+export const leaveAzit = (azitId: number) => call<null>('DELETE', `/v1/azits/${azitId}/members/me`)
+
+export const updateMemberRole = (azitId: number, accountId: number, role: 'admin' | 'member') =>
+  call<MemberRes>('PATCH', `/v1/azits/${azitId}/members/${accountId}/role`, { role })
+
+export const kickMember = (azitId: number, accountId: number) => call<null>('DELETE', `/v1/azits/${azitId}/members/${accountId}`)
 
 export const listMemes = (azitId: number) => call<MemeRes[]>('GET', `/v1/azits/${azitId}/memes`)
 

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  createInvite, createMeme, createRoom, deleteMeme, errorText, isAdmin, listInvites, listMemes, listReacts, listRooms,
-  renameRoom, reorderRooms, replaceReacts, revokeInvite, uploadFile,
-  type AzitRes, type InviteRes, type MemeRes, type ReactItem, type ReactRes, type RoomRes,
+  createInvite, createMeme, createRoom, deleteMeme, errorText, isAdmin, kickMember, leaveAzit, listInvites, listMembers, listMemes,
+  listReacts, listRooms, renameRoom, reorderRooms, replaceReacts, revokeInvite, updateMemberRole, updateMyNickname, uploadFile,
+  type AzitRes, type InviteRes, type MemberRes, type MemeRes, type ReactItem, type ReactRes, type RoomRes, type Role,
 } from '../../api/server'
-import type { Azit, InviteCode, ReactOption, Room, Sticker } from '../../api/types'
+import type { Azit, InviteCode, Member, ReactOption, Room, Sticker } from '../../api/types'
 import { Shell } from '../../app/Shell'
 import { ago, left, type Me } from '../../lib/chat'
 import { shrinkImage } from '../../lib/image'
@@ -12,26 +12,30 @@ import { ChatScreen } from '../chat/ChatScreen'
 import { NewRoomModal } from '../rooms/NewRoomModal'
 import { RoomList } from '../rooms/RoomList'
 import { CodesTab, type CodeExpiry } from './settings/CodesTab'
+import { LeaveTab } from './settings/LeaveTab'
+import { MembersTab } from './settings/MembersTab'
 import { ReactsTab } from './settings/ReactsTab'
 import { RoomsTab } from './settings/RoomsTab'
 import { SettingsView, type SettingsTab } from './settings/SettingsView'
 import { StickersTab } from './settings/StickersTab'
 
 const ROOMS_POLL_MS = 5000
-// 서버 API 가 있는 설정 탭만 (기본 정보·멤버·변경 기록·나가기는 아직 없음)
-const TABS: SettingsTab[] = ['codes', 'rooms', 'reacts', 'stickers']
+// 서버 API 가 있는 설정 탭만 (기본 정보·변경 기록은 아직 없음)
+const TABS: SettingsTab[] = ['codes', 'members', 'rooms', 'reacts', 'stickers', 'leave']
 const ROLE_LABEL = { super_admin: '만든 사람', admin: '관리자', member: '멤버', '': '' } as const
 
 type Props = {
   azit: AzitRes
   me: Me
   onBack: () => void
+  onChanged?: () => void // 내 닉네임·인원이 바뀌었다 → 아지트 목록 다시 받기
+  onLeft?: () => void // 아지트를 나갔다
 }
 
 export const shortName = (name: string) => Array.from(name.trim()).slice(0, 2).join('')
 
 // 아지트 안: 방 목록 + (채팅 | 설정). 방·맞장구 목록·짤은 여기서 받아 아래로 나눠 준다.
-export function AzitScreen({ azit, me, onBack }: Props) {
+export function AzitScreen({ azit, me, onBack, onChanged, onLeft }: Props) {
   const azitId = azit.azit_id
   const admin = isAdmin(azit.my_role)
   const [rooms, setRooms] = useState<RoomRes[]>([])
@@ -119,6 +123,8 @@ export function AzitScreen({ azit, me, onBack }: Props) {
     body = (
       <SettingsView tab={view} tabs={TABS} hint={`내 역할: ${ROLE_LABEL[azit.my_role]}`} onTab={(t) => { setView(t); setError(undefined) }}>
         {view === 'codes' && <Codes azitId={azitId} meId={me.id} readOnly={!admin} />}
+        {view === 'members' && <Members azitId={azitId} meId={me.id} myRole={azit.my_role} onChanged={onChanged} />}
+        {view === 'leave' && <Leave azitId={azitId} owner={azit.my_role === 'super_admin'} onLeft={onLeft} />}
         {view === 'rooms' && (
           <RoomsSettings
             azitId={azitId}
@@ -172,6 +178,70 @@ export function AzitScreen({ azit, me, onBack }: Props) {
 }
 
 /* ---------- 설정 탭들 (서버와 주고받기) ---------- */
+
+function Members({ azitId, meId, myRole, onChanged }: { azitId: number; meId: number; myRole: Role | ''; onChanged?: () => void }) {
+  const [members, setMembers] = useState<MemberRes[]>([])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+
+  const load = useCallback(() => listMembers(azitId).then(setMembers).catch((e) => setError(errorText(e))), [azitId])
+  useEffect(() => { void load() }, [load])
+
+  // 바꾸고 나면 목록을 다시 받는다 (역할이 바뀌면 순서도 바뀌니까)
+  const run = async (f: () => Promise<unknown>) => {
+    setBusy(true)
+    try {
+      await f()
+      setError(undefined)
+      await load()
+      onChanged?.()
+      return true
+    } catch (e) {
+      setError(errorText(e))
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const views: Member[] = members.map((m) => ({
+    id: String(m.account_id), nick: m.nickname, name: m.name, color: m.color, src: m.avatar_url || undefined, role: m.role, joinedAgo: ago(m.joined_at),
+  }))
+
+  return (
+    <MembersTab
+      members={views}
+      meId={String(meId)}
+      myRole={myRole || 'member'}
+      busy={busy}
+      error={error}
+      onNick={(nick) => run(() => updateMyNickname(azitId, nick))}
+      onRole={(id, role) => void run(() => updateMemberRole(azitId, Number(id), role))}
+      onKick={(id) => void run(() => kickMember(azitId, Number(id)))}
+    />
+  )
+}
+
+function Leave({ azitId, owner, onLeft }: { azitId: number; owner: boolean; onLeft?: () => void }) {
+  const [presses, setPresses] = useState<0 | 1 | 2>(0)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+
+  const press = async () => {
+    if (presses < 2) { setPresses((p) => (p + 1) as 1 | 2); return }
+    setBusy(true)
+    try {
+      await leaveAzit(azitId)
+      onLeft?.()
+    } catch (e) {
+      setError(errorText(e))
+      setPresses(0)
+      setBusy(false)
+    }
+  }
+
+  return <LeaveTab owner={owner} presses={presses} busy={busy} error={error} onPress={() => void press()} />
+}
 
 function Codes({ azitId, meId, readOnly }: { azitId: number; meId: number; readOnly: boolean }) {
   const [codes, setCodes] = useState<InviteRes[]>([])

@@ -14,6 +14,8 @@ export type Member = {
   via?: string // "MK7Q2X로 들어옴", "아지트를 만듦"
   joinedAgo?: string
   src?: string // 프사 주소
+  name?: string // 계정 이름 (@ 뒤)
+  role?: 'super_admin' | 'admin' | 'member'
 }
 
 export type Azit = {

@@ -191,6 +191,7 @@
 /* 멤버 */
 .member-search { width: 220px; }
 .member-sub { font-size: 12px; color: var(--mu); }
+.member-nick { height: 32px; width: 180px; }
 
 /* 방 관리 */
 .rooms-manage { display: flex; gap: 20px; flex-wrap: wrap; }

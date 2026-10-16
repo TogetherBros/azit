@@ -1,41 +1,32 @@
 type Props = {
-  myMessages: number
-  myLiveCodes: number
-  wipe?: boolean // 내 메시지 전부 지우기 선택
+  owner?: boolean // 만든 사람은 나갈 수 없다
   presses?: 0 | 1 | 2 // 세 번 눌러서 나가기 진행도
+  busy?: boolean
+  error?: string
+  onPress?: () => void
 }
 
 const PRESS_LABEL = ['세 번 눌러서 나가기', '한 번 더...', '마지막으로 누르면 나가요']
 
-// 아지트 나가기: 아지트와 방은 남고, 내 흔적만 어떻게 할지 정한다.
-export function LeaveTab({ myMessages, myLiveCodes, wipe, presses = 0 }: Props) {
-  const choices: [boolean, string, string][] = [
-    [false, '남기기', '이름만 "나간 멤버"로 바뀌어요'],
-    [true, '전부 지우기', '대화 흐름에 빈칸이 생겨요'],
-  ]
+// 아지트 나가기: 아지트와 방, 내 메시지는 그대로 남는다. 실수로 나가지 않게 세 번 눌러야 나가진다.
+export function LeaveTab({ owner, presses = 0, busy, error, onPress }: Props) {
   return (
     <>
       <h1 className="page-title sm">아지트 나가기</h1>
-      <span className="hint">나가도 아지트와 방은 그대로 남아요. 내 흔적을 어떻게 할지만 정해요.</span>
+      <span className="hint">나가도 아지트와 방, 내가 보낸 메시지는 그대로 남아요.</span>
       <div className="leave">
-        <div className="card col">
-          <span className="b">내 메시지 <span className="lbl-sub">{myMessages}개</span></span>
-          <div className="grid2">
-            {choices.map(([v, name, desc]) => (
-              <button key={name} type="button" className={`choice${!!wipe === v ? ' on' : ''}`} aria-pressed={!!wipe === v}>
-                <span className="choice-name">{name}</span>
-                <span className="hint">{desc}</span>
-              </button>
-            ))}
-          </div>
-        </div>
         <div className="card hint">
-          내가 만든 살아 있는 초대 코드 {myLiveCodes}개는 자동으로 폐기돼요. 칭호와 도감은 이 아지트 것이라 사라져요. 다시 들어오려면 새 초대 코드가 필요해요.
+          {owner
+            ? '만든 사람은 아지트를 나갈 수 없어요.'
+            : '다시 들어오려면 새 초대 코드가 필요해요.'}
         </div>
-        <button type="button" className="btn l dg hold-btn">
-          <span className="hold-fill" style={{ width: `${presses * 50}%` }} />
-          <span className="hold-label">{PRESS_LABEL[presses]}</span>
-        </button>
+        {error && <span role="alert" className="ferr">{error}</span>}
+        {!owner && (
+          <button type="button" className="btn l dg hold-btn" disabled={busy} onClick={onPress}>
+            <span className="hold-fill" style={{ width: `${presses * 50}%` }} />
+            <span className="hold-label">{busy ? '나가는 중…' : PRESS_LABEL[presses]}</span>
+          </button>
+        )}
       </div>
     </>
   )
