@@ -276,11 +276,6 @@ const E = [
   errors: [['name_cooldown', 429, '이름은 10분에 한 번 바꿀 수 있어요 · {n}분 뒤에'], ['validation_failed', 400, '이름은 30자까지 / 짧은 이름은 3자까지 / 소개는 40자까지'], ['room_not_found', 400, '(landing_room_id 가 이 아지트 방이 아님)']],
   go: ['PATCH 는 "안 보낸 필드"와 "빈 값"을 구분해야 해요. 구조체 필드를 포인터(<code>*string</code>)로 두면 nil = 안 보냄.'] },
 
-{ id: 'azit-leave', name: '아지트 나가기', method: 'POST', path: '/v1/azits/{azit_id}/leave', domain: '아지트', mvp: 'MVP 2', auth: '세션',
-  screens: 'set-leave', desc: '아지트·방은 그대로. 내 메시지는 남기거나 전부 지워요. 내가 만든 살아 있는 코드는 자동 폐기.',
-  body: { wipe_messages: false }, status: '204',
-  notes: ['남기기: 내 메시지 작성자가 화면에 "나간 멤버"로 보여요 (azit_members 에서 빠지니까).', '마지막 한 명이 나가도 아지트는 안 지워요.'] },
-
 /* ---------------- 초대 코드 ---------------- */
 { id: 'invite-preview', name: '초대 코드 미리보기', method: 'GET', path: '/v1/invites/{code}', domain: '초대 코드', mvp: 'MVP 1', auth: '세션 또는 가입 티켓',
   screens: 'join-code, join-code-error, join-preview',
@@ -313,28 +308,29 @@ const E = [
   screens: 'set-codes', desc: '되돌릴 수 없어요. 이미 들어온 멤버는 그대로. 변경 기록 "코드"에 남아요.', status: '204',
   errors: [['not_found', 404, '(이 아지트 코드가 아님)']] },
 
-/* ---------------- 멤버 ---------------- */
-{ id: 'member-me-patch', name: '내 닉네임·색·칭호 바꾸기', method: 'PATCH', path: '/v1/azits/{azit_id}/members/me', domain: '멤버', mvp: 'MVP 2', auth: '세션',
-  screens: 'me', desc: '아지트마다 다른 닉네임. 칭호는 얻은 것만 장착 가능, <code>""</code>이면 빼기. 바뀌면 <code>member.updated</code> 이벤트.',
-  body: { nick: '문경', color: '#7BC4FF', title: '눈치 백단' }, res: MEMBER, status: '200',
-  errors: [['nick_taken', 409, '이 아지트에 같은 닉네임이 있어요'], ['title_locked', 400, '(아직 못 얻은 칭호)'], ['validation_failed', 400, '닉네임을 넣어 주세요 / 닉네임은 12자까지예요']] },
+/* ---------------- 멤버 ----------------
+ * 실제 서버 코드 기준 (2026-10-16). server/internal/member/handler.go. 전부 member.RequireMember 뒤 (멤버가 아니면 404). */
+{ id: 'members-list', st: 'done', name: '멤버 목록', method: 'GET', path: '/v1/azits/{azit_id}/members', domain: '멤버', mvp: 'MVP 1', auth: '세션',
+  screens: 'set-members', desc: '지금 들어와 있는 멤버 전부. 만든 사람 → 관리자 → 멤버 순, 같은 역할이면 들어온 순. 이름·색·사진·소개는 계정 것, 닉네임은 이 아지트 것.',
+  res: [{ account_id: 2, name: 'friend_2', nickname: '강백호', color: '#7BC4FF', avatar_url: '', bio: '', role: 'member', joined_at: '2026-10-16T05:00:00Z' }], status: '200' },
 
-{ id: 'member-get', name: '멤버 프로필', method: 'GET', path: '/v1/azits/{azit_id}/members/{account_id}', domain: '멤버', mvp: 'MVP 2', auth: '세션',
-  screens: 'modal-member, modal-member-me', desc: '프로필 모달. 전적 숫자는 라이어게임(MVP 3) 전엔 전부 0.',
-  res: Object.assign({}, MEMBER, { stats: { games: 4, catches: 1, liar_survive: 0, liar_games: 1, snipes: 0, citizen_wins: 2, shakes: 5 }, title_count: 2 }), status: '200',
-  errors: [['member_not_found', 404, '나간 멤버예요']] },
+{ id: 'member-me-patch', st: 'done', name: '이 아지트 내 닉네임 바꾸기', method: 'PATCH', path: '/v1/azits/{azit_id}/members/me', domain: '멤버', mvp: 'MVP 1', auth: '세션',
+  screens: 'set-members', desc: '들어올 때 계정 닉네임이 복사되고, 여기서 이 아지트 것만 바꿔요. 앞뒤 공백은 지워요. 겹쳐도 돼요.',
+  body: { nickname: '대장' }, res: { account_id: 2, name: 'friend_2', nickname: '강백호', color: '#7BC4FF', avatar_url: '', bio: '', role: 'member', joined_at: '2026-10-16T05:00:00Z' }, status: '200',
+  errors: [['bad_request', 400, '닉네임을 넣어 주세요 / 닉네임은 16자까지예요']] },
 
-{ id: 'member-kick', name: '멤버 내보내기', method: 'POST', path: '/v1/azits/{azit_id}/members/{account_id}/kick', domain: '멤버', mvp: 'MVP 2', auth: '세션',
-  screens: 'modal-kick, set-members', desc: '모두 주인이라 누구나. 변경 기록에 남고 누구나 되돌릴 수 있어요. <code>ban</code>이면 새 코드로도 못 들어와요.',
-  body: { ban: false }, status: '204',
-  errors: [['cannot_kick_self', 400, '(나 자신은 "나가기"로)'], ['member_not_found', 404, '나간 멤버예요']],
-  notes: ['내보내진 사람의 열린 WebSocket 에 <code>azit.removed</code>를 보내고 그 아지트 구독을 끊어요.'] },
+{ id: 'member-leave', st: 'done', name: '아지트 나가기', method: 'DELETE', path: '/v1/azits/{azit_id}/members/me', domain: '멤버', mvp: 'MVP 1', auth: '세션',
+  screens: 'set-leave', desc: '줄은 지우지 않고 <code>left_at</code>만 채워요. 보낸 메시지와 닉네임은 남아요. 초대 코드로 다시 들어오면 그 줄을 살려요 (역할은 member 로).', status: '204',
+  errors: [['bad_request', 400, '만든 사람은 아지트를 나갈 수 없어요 (넘기기 기능 전까지)']] },
 
-{ id: 'bans-list', name: '막은 사람 목록', method: 'GET', path: '/v1/azits/{azit_id}/bans', domain: '멤버', mvp: 'MVP 2', auth: '세션',
-  screens: 'set-members', desc: '', res: { bans: [{ account_id: 9, name: '권재현', banned_by_nick: '강백호', banned_at: '2026-10-01T00:00:00Z' }] }, status: '200' },
+{ id: 'member-role', st: 'done', name: '관리자 올리기·내리기', method: 'PATCH', path: '/v1/azits/{azit_id}/members/{account_id}/role', domain: '멤버', mvp: 'MVP 1', auth: '세션 · super_admin',
+  screens: 'set-members', desc: '만든 사람만. <code>role</code>은 <code>admin</code> 또는 <code>member</code>. 만든 사람 자리는 줄 수도 바꿀 수도 없어요.',
+  body: { role: 'admin' }, res: { account_id: 2, name: 'friend_2', nickname: '강백호', color: '#7BC4FF', avatar_url: '', bio: '', role: 'member', joined_at: '2026-10-16T05:00:00Z' }, status: '200',
+  errors: [['forbidden', 403, '만든 사람만 역할을 바꿀 수 있어요 / 만든 사람의 역할은 바꿀 수 없어요'], ['bad_request', 400, '관리자나 멤버만 고를 수 있어요 / 나 자신에게는 할 수 없어요'], ['not_found', 404, '이 아지트 멤버가 아니에요']] },
 
-{ id: 'bans-delete', name: '막은 것 풀기', method: 'DELETE', path: '/v1/azits/{azit_id}/bans/{account_id}', domain: '멤버', mvp: 'MVP 2', auth: '세션',
-  screens: 'set-members', desc: '풀어도 자동으로 다시 들어오진 않아요. 새 코드가 필요해요.', status: '204' },
+{ id: 'member-kick', st: 'done', name: '멤버 내보내기', method: 'DELETE', path: '/v1/azits/{azit_id}/members/{account_id}', domain: '멤버', mvp: 'MVP 1', auth: '세션 · admin 이상',
+  screens: 'set-members', desc: '나보다 역할이 낮은 사람만 (관리자 → 멤버, 만든 사람 → 관리자·멤버). 나가기와 똑같이 <code>left_at</code>만 채워요. 초대 코드가 있으면 다시 들어올 수 있어요 (막기 없음).', status: '204',
+  errors: [['forbidden', 403, '관리자만 내보낼 수 있어요 / 나보다 역할이 낮은 사람만 내보낼 수 있어요'], ['bad_request', 400, '나 자신에게는 할 수 없어요'], ['not_found', 404, '이 아지트 멤버가 아니에요']] },
 
 /* ---------------- 방 ----------------
  * 여기서부터 사진·짤까지는 실제 서버 코드 기준 (2026-10-16). 경로는 전부 /v1/azits/{azit_id} 아래이고,
