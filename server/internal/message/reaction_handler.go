@@ -11,7 +11,7 @@ import (
 )
 
 // AddReaction 은 메시지에 맞장구를 단다. 멤버면 누구나. PUT /v1/azits/{id}/messages/{messageId}/reactions
-// 글자(2자까지)는 아무거나, 짤은 이 아지트 짤 모음에 있는 것만. 이미 달았으면 그대로 (두 번 눌러도 같은 결과).
+// 글자는 아지트 맞장구 목록에 있는 것만, 짤은 이 아지트 짤 모음에 있는 것만 (목록에 없어도 됨). 이미 달았으면 그대로 (두 번 눌러도 같은 결과).
 // 응답은 그 메시지의 맞장구 묶음 전체 (앱이 그대로 다시 그린다).
 func (h *Handler) AddReaction(c fiber.Ctx) error {
 	ctx := c.Context()
@@ -20,6 +20,17 @@ func (h *Handler) AddReaction(c fiber.Ctx) error {
 	m, text, memeID, err := h.reactionTarget(c, me)
 	if err != nil {
 		return err
+	}
+
+	// 글자 맞장구면 아지트 맞장구 목록에 있는 글자인지
+	if text != "" {
+		ok, err := h.memeRepo.HasReactText(ctx, me.AzitID, text)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return badRequest(errors.New("아지트 맞장구 목록에 있는 글자만 달 수 있어요"))
+		}
 	}
 
 	// 짤 맞장구면 우리 아지트의 지우지 않은 짤인지

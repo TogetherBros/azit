@@ -8,7 +8,7 @@ import (
 
 const (
 	MaxNameLen   = 20 // 짤 이름 글자 수
-	MaxReactText = 2  // 글자 맞장구 글자 수
+	MaxReactText = 4  // 글자 맞장구 글자 수 (1~4자)
 	MaxReacts    = 10 // 아지트 맞장구 목록 칸 수
 )
 
@@ -17,7 +17,7 @@ var (
 	ErrNameLong       = errors.New("짤 이름은 20자까지예요")
 	ErrReactEmpty     = errors.New("글자나 짤 중 하나를 골라 주세요")
 	ErrReactBoth      = errors.New("글자와 짤은 하나만 고를 수 있어요")
-	ErrReactTextLong  = errors.New("맞장구 글자는 2자까지예요")
+	ErrReactTextLong  = errors.New("맞장구 글자는 4자까지예요")
 	ErrTooManyReacts  = errors.New("맞장구 목록은 10개까지예요")
 	ErrDuplicateReact = errors.New("같은 맞장구가 두 번 들어 있어요")
 )

@@ -392,10 +392,10 @@ const E = [
   errors: [['forbidden', 403, '내가 보낸 메시지만 지울 수 있어요'], ['not_found', 404, '메시지가 없어요']] },
 
 { id: 'reactions-put', st: 'done', name: '맞장구 달기', method: 'PUT', path: '/v1/azits/{azit_id}/messages/{message_id}/reactions', domain: '메시지', mvp: 'MVP 1', auth: '세션',
-  screens: 'chat 메시지 hover 메뉴', desc: '글자(1~2자, 아무거나) 또는 이 아지트 짤 하나. 같은 걸 두 번 PUT 해도 한 번 (멱등). 응답은 그 메시지의 맞장구 묶음 전체.',
+  screens: 'chat 메시지 hover 메뉴', desc: '글자(1~4자, 아지트 맞장구 목록에 있는 것만) 또는 이 아지트 짤 하나 (짤은 목록에 없어도 됨). 같은 걸 두 번 PUT 해도 한 번 (멱등). 응답은 그 메시지의 맞장구 묶음 전체.',
   body: { text: 'ㅋㅋ', meme_id: 0 }, res: [{ text: 'ㅋㅋ', meme_id: 0, meme_url: '', count: 2, mine: true }, { text: '', meme_id: 5, meme_url: 'https://…(R2 보기 링크)', count: 1, mine: false }], status: '200',
   extra: [['짤 맞장구', { text: '', meme_id: 5 }]],
-  errors: [['bad_request', 400, '글자나 짤 중 하나를 골라 주세요 / 둘 다는 안 돼요 / 2자까지 / 짤이 없어요 / 지운 메시지예요'], ['react_limit', 409, '이 메시지에는 맞장구를 더 달 수 없어요 (10종류까지)']],
+  errors: [['bad_request', 400, '글자나 짤 중 하나를 골라 주세요 / 둘 다는 안 돼요 / 4자까지 / 목록에 있는 글자만 / 짤이 없어요 / 지운 메시지예요'], ['react_limit', 409, '이 메시지에는 맞장구를 더 달 수 없어요 (10종류까지)']],
   notes: ['한 사람이 여러 종류를 달 수 있어요. 같은 맞장구는 묶어서 "ㅋㅋ 2".', '한 메시지에 <b>종류</b> 최대 10개. 이미 있는 종류에는 계속 달 수 있어요.', '저장은 아지트 목록 id 가 아니라 내용(글자 / 짤 id) → 목록을 바꿔도 이미 단 맞장구는 안 깨져요.', '바뀌면 웹소켓으로 그 메시지의 최종 묶음을 보낼 예정 (증감 말고 최종값 → 순서 꼬여도 안전).'] },
 
 { id: 'reactions-delete', st: 'done', name: '맞장구 떼기', method: 'DELETE', path: '/v1/azits/{azit_id}/messages/{message_id}/reactions', domain: '메시지', mvp: 'MVP 1', auth: '세션',
@@ -434,8 +434,8 @@ const E = [
 { id: 'reacts-put', st: 'done', name: '맞장구 목록 통째로 바꾸기', method: 'PUT', path: '/v1/azits/{azit_id}/reacts', domain: '사진·짤', mvp: 'MVP 1', auth: '세션 · admin 이상',
   screens: 'set-stickers (순서·추가·빼기)', desc: '순서 바꾸기·넣기·빼기를 전부 "최종 목록 PUT" 하나로. 응답은 바뀐 목록.',
   body: { reacts: [{ text: 'ㅋㅋ' }, { text: '헐' }, { meme_id: 5 }] }, res: '맞장구 목록과 같음', status: '200',
-  errors: [['bad_request', 400, '10개까지 / 같은 맞장구가 두 번 / 글자 2자까지 / 짤이 없어요'], ['forbidden', 403, '관리자만 할 수 있어요']],
-  notes: ['칸마다 글자(1~2자) 또는 이 아지트 짤 하나.', '목록을 바꿔도 메시지에 이미 달린 맞장구는 그대로 (맞장구는 목록 id 가 아니라 내용으로 저장).'] },
+  errors: [['bad_request', 400, '10개까지 / 같은 맞장구가 두 번 / 글자 4자까지 / 짤이 없어요'], ['forbidden', 403, '관리자만 할 수 있어요']],
+  notes: ['칸마다 글자(1~4자) 또는 이 아지트 짤 하나.', '목록을 바꿔도 메시지에 이미 달린 맞장구는 그대로 (맞장구는 목록 id 가 아니라 내용으로 저장).'] },
 
 /* ---------------- 알림 ---------------- */
 { id: 'notifs-list', name: '알림 목록', method: 'GET', path: '/v1/notifications', domain: '알림', mvp: 'MVP 2', auth: '세션',

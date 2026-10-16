@@ -104,6 +104,15 @@ func (r *Repository) ReplaceReacts(ctx context.Context, azitID int64, reacts []R
 
 // CountActiveAmong 은 memeIDs 중 이 아지트의 지우지 않은 짤이 몇 개인지 센다.
 // "맞장구 목록에 넣은 짤이 전부 우리 아지트 짤인가" 를 쿼리 한 번으로 볼 때 쓴다.
+// HasReactText 는 아지트 맞장구 목록에 이 글자 칸이 있는지 본다.
+func (r *Repository) HasReactText(ctx context.Context, azitID int64, text string) (bool, error) {
+	var n int64
+	err := r.db.WithContext(ctx).Model(&React{}).
+		Where("azit_id = ? AND text = ?", azitID, text).
+		Count(&n).Error
+	return n > 0, err
+}
+
 func (r *Repository) CountActiveAmong(ctx context.Context, azitID int64, memeIDs []int64) (int64, error) {
 	var n int64
 	err := r.db.WithContext(ctx).Model(&Meme{}).

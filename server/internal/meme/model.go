@@ -15,7 +15,7 @@ type Meme struct {
 }
 
 // React 는 아지트 맞장구 목록(빠른 선택용)의 한 칸. 아지트마다 최대 10개, 순서가 있다.
-// 글자(2자까지) 또는 아지트 짤 하나 중 하나만 채운다.
+// 글자(1~4자) 또는 아지트 짤 하나 중 하나만 채운다.
 type React struct {
 	ReactID  int64  `gorm:"primaryKey"`
 	AzitID   int64  `gorm:"not null;index"`

@@ -20,7 +20,7 @@ type CreateMemeRequest struct {
 
 // ReactItem 은 아지트 맞장구 목록의 한 칸. 글자(Text) 또는 짤(MemeID) 중 하나만 채운다.
 type ReactItem struct {
-	Text   string `json:"text"`    // 1~2자. 짤이면 ""
+	Text   string `json:"text"`    // 1~4자. 짤이면 ""
 	MemeID int64  `json:"meme_id"` // 아지트 짤 id. 글자면 0
 }
 

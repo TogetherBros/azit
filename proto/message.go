@@ -54,7 +54,7 @@ type UpdateMessageRequest struct {
 // ReactionRequest 는 PUT / DELETE /v1/azits/{id}/messages/{messageId}/reactions 의 요청이다.
 // 글자(Text) 또는 짤(MemeID) 중 하나만 채운다. 응답은 그 메시지의 []ReactionResponse.
 type ReactionRequest struct {
-	Text   string `json:"text"`    // 1~2자. 짤이면 ""
+	Text   string `json:"text"`    // 1~4자. 짤이면 ""
 	MemeID int64  `json:"meme_id"` // 아지트 짤 id. 글자면 0
 }
 
