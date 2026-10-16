@@ -2,7 +2,9 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"log"
+	"net/http"
 	"sync"
 
 	"github.com/TogetherBros/azit/desktop/internal/client"
@@ -19,6 +21,8 @@ type AuthService struct {
 
 	mu     sync.Mutex
 	tokens proto.TokenResponse
+
+	refreshMu sync.Mutex // 갱신은 한 번에 하나만
 }
 
 func NewAuthService(api *client.Client, clientID string) *AuthService {
@@ -76,4 +80,49 @@ func (s *AuthService) accessToken() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.tokens.AccessToken
+}
+
+// withToken 은 AT 를 붙여 서버를 부른다. AT 가 만료돼 401 이 오면 RT 로 한 번 갱신하고 다시 부른다.
+// (AT 는 15분짜리라, 앱을 켜 두면 금방 만료된다)
+func (s *AuthService) withToken(ctx context.Context, call func(token string) error) error {
+	token := s.accessToken()
+	err := call(token)
+
+	var apiErr *client.APIError
+	if !errors.As(err, &apiErr) || apiErr.Status != http.StatusUnauthorized {
+		return err
+	}
+
+	if err := s.refresh(ctx, token); err != nil {
+		return err
+	}
+	return call(s.accessToken())
+}
+
+// refresh 는 RT 로 토큰을 새로 받는다. 화면이 여러 API 를 한꺼번에 불러 동시에 401 이 나도
+// 한 번만 갱신하도록, 그 사이 다른 쪽이 이미 갱신했으면(AT 가 바뀌었으면) 그냥 돌아간다.
+func (s *AuthService) refresh(ctx context.Context, usedToken string) error {
+	s.refreshMu.Lock()
+	defer s.refreshMu.Unlock()
+
+	s.mu.Lock()
+	cur := s.tokens
+	s.mu.Unlock()
+
+	if cur.AccessToken != usedToken {
+		return nil
+	}
+	if cur.RefreshToken == "" {
+		return errors.New("다시 로그인해 주세요")
+	}
+
+	tokens, err := s.api.Refresh(ctx, cur.RefreshToken)
+	if err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	s.tokens = tokens
+	s.mu.Unlock()
+	return nil
 }

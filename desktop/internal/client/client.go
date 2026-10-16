@@ -43,6 +43,19 @@ func (c *Client) GoogleLogin(ctx context.Context, req proto.GoogleLoginRequest) 
 	return out, err
 }
 
+// Refresh 는 RT 로 새 AT·RT 를 받는다. 쓴 RT 는 서버에서 버려지니 받은 RT 로 바꿔 들고 있어야 한다.
+func (c *Client) Refresh(ctx context.Context, refreshToken string) (proto.TokenResponse, error) {
+	var out proto.TokenResponse
+	err := c.do(ctx, http.MethodPost, "/v1/auth/refresh", "", proto.RefreshRequest{RefreshToken: refreshToken}, &out)
+	return out, err
+}
+
+// Call 은 아무 서버 API 나 부른다. 아지트·방·메시지처럼 화면이 직접 모양을 아는 API 는
+// 하나씩 함수를 만들지 않고 이걸로 부른다 (React 의 api/*.ts 에 경로와 모양이 있다).
+func (c *Client) Call(ctx context.Context, method, path, token string, in, out any) error {
+	return c.do(ctx, method, path, token, in, out)
+}
+
 // Me 는 내 프로필을 받는다. 사진은 24시간짜리 보기 주소로 온다.
 func (c *Client) Me(ctx context.Context, token string) (proto.MeResponse, error) {
 	var out proto.MeResponse
@@ -148,7 +161,7 @@ func (c *Client) do(ctx context.Context, method, path, token string, in, out any
 		return fmt.Errorf("API error: %s", resp.Status)
 	}
 
-	if out == nil {
+	if out == nil || resp.StatusCode == http.StatusNoContent {
 		return nil
 	}
 	return json.NewDecoder(resp.Body).Decode(out)

@@ -26,6 +26,7 @@ func main() {
 	api := client.New(serverURL)
 	auth := bridge.NewAuthService(api, googleClientID)
 	profile := bridge.NewProfileService(api, auth)
+	apiService := bridge.NewAPIService(api, auth)
 
 	app := application.New(application.Options{
 		Name:        "azit",
@@ -34,6 +35,7 @@ func main() {
 			application.NewService(&GreetService{}),
 			application.NewService(auth),
 			application.NewService(profile),
+			application.NewService(apiService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
