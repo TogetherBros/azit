@@ -269,11 +269,14 @@ const E = [
   res: { id: 1, name: '의성읍...', short: '의성', color: '#D4FF3A', desc: '낚시하다 강아지 낚은 사람들의 모임', landing_room_id: 1, welcome: true, name_changed_by: 3, name_changed_at: '2026-10-06T12:00:00Z', members: [MEMBER] },
   status: '200', errors: [['not_found', 404, '(멤버가 아니어도 404 — 아지트가 있는지조차 숨김)']] },
 
-{ id: 'azit-patch', name: '아지트 기본 정보 바꾸기', method: 'PATCH', path: '/v1/azits/{azit_id}', domain: '아지트', mvp: 'MVP 2', auth: '세션',
-  screens: 'set-general', desc: '보낸 필드만 바꿔요. 바뀐 필드마다 변경 기록이 남고 되돌릴 수 있어요. 모두 주인이라 멤버 누구나.',
-  body: { name: '의성 낚시회', short: '의성', color: '#D4FF3A', desc: '…', landing_room_id: 1, welcome: true },
-  res: '아지트 자세히와 같음', status: '200',
-  errors: [['name_cooldown', 429, '이름은 10분에 한 번 바꿀 수 있어요 · {n}분 뒤에'], ['validation_failed', 400, '이름은 30자까지 / 짧은 이름은 3자까지 / 소개는 40자까지'], ['room_not_found', 400, '(landing_room_id 가 이 아지트 방이 아님)']],
+{ id: 'azit-patch', st: 'done', name: '아지트 기본 정보 바꾸기', method: 'PATCH', path: '/v1/azits/{azit_id}', domain: '아지트', mvp: 'MVP 2', auth: '세션 · admin 이상',
+  screens: 'set-general', desc: '보낸 칸만 바꿔요 (안 보낸 칸은 그대로). 응답은 바뀐 아지트를 <code>GET /v1/azits</code> 목록 한 줄과 같은 모양으로.',
+  body: { name: '의성 낚시회', color: '#D4FF3A', description: '낚시하다 강아지 낚은 사람들', banner_key: 'azit-banners/1/ABCD….webp' },
+  res: { azit_id: 1, name: '의성 낚시회', color: '#D4FF3A', description: '낚시하다 강아지 낚은 사람들', banner_url: 'https://…(R2 보기 링크)', member_count: 14, my_role: 'super_admin', my_nickname: '4n5rud' },
+  status: '200',
+  extra: [['소개와 배너 지우기', { description: '', banner_key: '' }]],
+  errors: [['forbidden', 403, '관리자만 바꿀 수 있어요'], ['bad_request', 400, '아지트 이름을 넣어 주세요 / 20자까지 / 고를 수 있는 색이 아니에요 / 소개는 40자까지예요 / 내 사진이 아니에요 / 업로드가 아직 안 끝났어요'], ['not_found', 404, '(멤버가 아님)']],
+  notes: ['배너: <code>POST /v1/uploads</code> (kind=azit_banner) → R2 PUT → 받은 키를 <code>banner_key</code>로. 내가 올린 <code>azit-banners/{내 id}/</code> 키만 받아요.', '이름·소개는 앞뒤 공백을 잘라요. 색은 대문자로 맞춰요.', '이름 바꾸기 쿨다운, 변경 기록은 아직 없어요 (변경 기록 기능 때 같이).'],
   go: ['PATCH 는 "안 보낸 필드"와 "빈 값"을 구분해야 해요. 구조체 필드를 포인터(<code>*string</code>)로 두면 nil = 안 보냄.'] },
 
 /* ---------------- 초대 코드 ---------------- */
@@ -312,11 +315,11 @@ const E = [
  * 실제 서버 코드 기준 (2026-10-16). server/internal/member/handler.go. 전부 member.RequireMember 뒤 (멤버가 아니면 404). */
 { id: 'members-list', st: 'done', name: '멤버 목록', method: 'GET', path: '/v1/azits/{azit_id}/members', domain: '멤버', mvp: 'MVP 1', auth: '세션',
   screens: 'set-members', desc: '지금 들어와 있는 멤버 전부. 만든 사람 → 관리자 → 멤버 순, 같은 역할이면 들어온 순. 이름·색·사진·소개는 계정 것, 닉네임은 이 아지트 것.',
-  res: [{ account_id: 2, name: 'friend_2', nickname: '강백호', color: '#7BC4FF', avatar_url: '', bio: '', role: 'member', joined_at: '2026-10-16T05:00:00Z' }], status: '200' },
+  res: [{ account_id: 2, name: 'friend_2', nickname: '강백호', color: '#7BC4FF', avatar_url: '', banner_url: '', bio: '', role: 'member', joined_at: '2026-10-16T05:00:00Z' }], status: '200' },
 
 { id: 'member-me-patch', st: 'done', name: '이 아지트 내 닉네임 바꾸기', method: 'PATCH', path: '/v1/azits/{azit_id}/members/me', domain: '멤버', mvp: 'MVP 1', auth: '세션',
   screens: 'set-members', desc: '들어올 때 계정 닉네임이 복사되고, 여기서 이 아지트 것만 바꿔요. 앞뒤 공백은 지워요. 겹쳐도 돼요.',
-  body: { nickname: '대장' }, res: { account_id: 2, name: 'friend_2', nickname: '강백호', color: '#7BC4FF', avatar_url: '', bio: '', role: 'member', joined_at: '2026-10-16T05:00:00Z' }, status: '200',
+  body: { nickname: '대장' }, res: { account_id: 2, name: 'friend_2', nickname: '강백호', color: '#7BC4FF', avatar_url: '', banner_url: '', bio: '', role: 'member', joined_at: '2026-10-16T05:00:00Z' }, status: '200',
   errors: [['bad_request', 400, '닉네임을 넣어 주세요 / 닉네임은 16자까지예요']] },
 
 { id: 'member-leave', st: 'done', name: '아지트 나가기', method: 'DELETE', path: '/v1/azits/{azit_id}/members/me', domain: '멤버', mvp: 'MVP 1', auth: '세션',
@@ -325,7 +328,7 @@ const E = [
 
 { id: 'member-role', st: 'done', name: '관리자 올리기·내리기', method: 'PATCH', path: '/v1/azits/{azit_id}/members/{account_id}/role', domain: '멤버', mvp: 'MVP 1', auth: '세션 · super_admin',
   screens: 'set-members', desc: '만든 사람만. <code>role</code>은 <code>admin</code> 또는 <code>member</code>. 만든 사람 자리는 줄 수도 바꿀 수도 없어요.',
-  body: { role: 'admin' }, res: { account_id: 2, name: 'friend_2', nickname: '강백호', color: '#7BC4FF', avatar_url: '', bio: '', role: 'member', joined_at: '2026-10-16T05:00:00Z' }, status: '200',
+  body: { role: 'admin' }, res: { account_id: 2, name: 'friend_2', nickname: '강백호', color: '#7BC4FF', avatar_url: '', banner_url: '', bio: '', role: 'member', joined_at: '2026-10-16T05:00:00Z' }, status: '200',
   errors: [['forbidden', 403, '만든 사람만 역할을 바꿀 수 있어요 / 만든 사람의 역할은 바꿀 수 없어요'], ['bad_request', 400, '관리자나 멤버만 고를 수 있어요 / 나 자신에게는 할 수 없어요'], ['not_found', 404, '이 아지트 멤버가 아니에요']] },
 
 { id: 'member-kick', st: 'done', name: '멤버 내보내기', method: 'DELETE', path: '/v1/azits/{azit_id}/members/{account_id}', domain: '멤버', mvp: 'MVP 1', auth: '세션 · admin 이상',
@@ -439,17 +442,22 @@ const E = [
   notes: ['칸마다 글자(1~4자) 또는 이 아지트 짤 하나.', '목록을 바꿔도 메시지에 이미 달린 맞장구는 그대로 (맞장구는 목록 id 가 아니라 내용으로 저장).'] },
 
 /* ---------------- 알림 ---------------- */
-{ id: 'notifs-list', name: '알림 목록', method: 'GET', path: '/v1/notifications', domain: '알림', mvp: 'MVP 2', auth: '세션',
-  screens: 'activity, activity-empty, 레일 종 배지', desc: '모든 아지트 것을 한곳에. 최근 순, 30일치.',
-  query: [['kind', 'string', 'shake | game | azit | title (azit = join + kick)'], ['before_id', 'int', '더 보기']],
-  res: { unread: 2, notifications: [{ id: 41, kind: 'shake', azit_id: 1, azit_short: '의성', read: false, created_at: '2026-10-07T05:10:00Z', data: { actor_nick: '김환성', room_id: 1, room_name: '다같이', message_id: 812 } }] }, status: '200',
-  notes: ['문구는 앱이 <code>kind + data</code>로 만들어요. 누르면 <code>data</code>로 그 방·메시지로 이동.'] },
+{ id: 'notifs-list', st: 'done', name: '알림 목록', method: 'GET', path: '/v1/notifications', domain: '알림', mvp: 'MVP 2', auth: '세션',
+  screens: 'activity, activity-empty, 레일 종 배지', desc: '모든 아지트 것을 한곳에. 최신 순 50개 + 안 읽은 수. 앱이 3초마다 불러서 종 숫자를 갱신하고, 새 <code>shake</code>가 오면 다른 방에 있어도 창을 흔들어요.',
+  res: { notifications: [{ notification_id: 41, kind: 'shake', azit_id: 1, azit_name: '의성', room_id: 1, room_name: '다같이', message_id: 812, actor_id: 3, actor_nickname: '김환성', preview: '@4n5rud 점심 내기 누가 쏨', read: false, created_at: '2026-10-16T05:10:00Z' }], unread: 2 }, status: '200',
+  notes: [
+    '<code>kind</code>: <b>shake</b> = 누가 나를 @로 불렀다 (@전체 포함, 나는 빼고) · <b>join</b> = 내 아지트에 누가 초대 코드로 들어왔다 (원래 있던 멤버 전원에게) · <b>kick</b> = 내가 내보내졌다 (내보내진 사람에게만). 스스로 나가기는 알림 없음.',
+    '알림은 그 일(메시지 보내기, 코드로 들어오기, 내보내기)과 같은 트랜잭션에서 저장해요. 일이 실패하면 알림도 안 남아요.',
+    '아지트·방 이름, 닉네임은 만들 때 적어 둬요 (나중에 바뀌거나 내보내져도 문구가 그대로).',
+    '문구는 앱이 <code>kind</code>와 이름들로 만들어요. 누르면 shake 는 그 방, join 은 그 아지트로 이동. kick 은 이미 못 들어가니 이동 없음.',
+    '<code>unread</code>는 50개 밖의 것도 세요.',
+  ] },
 
 { id: 'notifs-read', name: '알림 읽음', method: 'POST', path: '/v1/notifications/{id}/read', domain: '알림', mvp: 'MVP 2', auth: '세션',
-  screens: 'activity 항목 누르기', desc: '', status: '204' },
+  screens: 'activity 항목 누르기', desc: '(아직 없음) 지금은 "모두 읽음"만 있어요.', status: '204' },
 
-{ id: 'notifs-read-all', name: '알림 모두 읽음', method: 'POST', path: '/v1/notifications/read-all', domain: '알림', mvp: 'MVP 2', auth: '세션',
-  screens: 'activity [모두 읽음]', desc: '', status: '204' },
+{ id: 'notifs-read-all', st: 'done', name: '알림 모두 읽음', method: 'POST', path: '/v1/notifications/read-all', domain: '알림', mvp: 'MVP 2', auth: '세션',
+  screens: 'activity [모두 읽음], 알림 화면 열기', desc: '내 알림을 전부 읽음으로. 앱은 알림 화면을 열 때 불러요.', status: '204' },
 
 /* ---------------- 변경 기록 ---------------- */
 { id: 'log-list', name: '변경 기록', method: 'GET', path: '/v1/azits/{azit_id}/log', domain: '변경 기록', mvp: 'MVP 2', auth: '세션',
