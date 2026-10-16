@@ -205,7 +205,7 @@ const STATUS = [['todo', '구현 전', 'gray'], ['doing', '진행 중', 'blue'],
 // 자주 나오는 응답 조각
 const MEMBER = { account_id: 2, nick: '강백호', color: '#7BC4FF', title: '포커페이스', online: true, dnd: false, via_code: 'MK7Q2X', joined_at: '2026-09-20T11:02:00Z' };
 const ROOM = { room_id: 3, azit_id: 1, name: '게임방', position: 1, unread: 4 };
-const MSG = { message_id: 812, room_id: 3, temp_id: '0f8c1a2e-5b8d-4c1e-9a77-3b2f0d1c9e44', kind: 'text', body: '@강백호 점심 내기 누가 쏨', reply_to_id: null, shake_ids: [2], shake_all: false, created_at: '2026-10-16T05:10:00Z', edited_at: null, deleted: false, sender: { account_id: 1, nickname: '4n5rud', color: '#D4FF3A', avatar_url: 'https://…' }, reactions: [{ text: 'ㅋㅋ', meme_id: 0, meme_url: '', count: 2, mine: true }] };
+const MSG = { message_id: 812, room_id: 3, temp_id: '0f8c1a2e-5b8d-4c1e-9a77-3b2f0d1c9e44', kind: 'text', body: '@강백호 점심 내기 누가 쏨', meme_id: 0, media_url: '', reply_to_id: null, shake_ids: [2], shake_all: false, created_at: '2026-10-16T05:10:00Z', edited_at: null, deleted: false, sender: { account_id: 1, nickname: '4n5rud', color: '#D4FF3A', avatar_url: 'https://…' }, reactions: [{ text: 'ㅋㅋ', meme_id: 0, meme_url: '', count: 2, mine: true }] };
 
 /* 엔드포인트 하나 = 노션 데이터베이스 행 하나
  * f: { id, name, method, path, domain, mvp, auth, screens, desc, params, query, body, res, status, errors, notes, go } */
@@ -371,11 +371,16 @@ const E = [
   go: ['보낸 사람·@·맞장구를 메시지마다 조회하면 N+1. id 를 모아서 종류별로 <code>IN (…)</code> 한 번씩 → map 으로 붙여요 (<code>message/response.go</code> toResponses).'] },
 
 { id: 'messages-send', st: 'done', name: '메시지 보내기', method: 'POST', path: '/v1/azits/{azit_id}/rooms/{room_id}/messages', domain: '메시지', mvp: 'MVP 1', auth: '세션',
-  screens: 'chat 입력창, chat-mention', desc: '<code>temp_id</code>(번호표)는 앱이 메시지마다 한 번 만든 UUID. 같은 번호표로 다시 오면 새로 만들지 않고 처음 것을 돌려줘요 → 끊겨서 재전송해도 중복 0. <code>shake_ids</code>에 넣은 사람은 흔들려요.',
+  screens: 'chat 입력창, chat-mention, chat-plus, chat-sticker', desc: '<code>temp_id</code>(번호표)는 앱이 메시지마다 한 번 만든 UUID. 같은 번호표로 다시 오면 새로 만들지 않고 처음 것을 돌려줘요 → 끊겨서 재전송해도 중복 0. <code>shake_ids</code>에 넣은 사람은 흔들려요. <code>kind</code>로 글자·사진·짤을 골라요 (생략하면 글자).',
   body: { temp_id: '0f8c1a2e-5b8d-4c1e-9a77-3b2f0d1c9e44', body: '@강백호 점심 내기 누가 쏨', reply_to_id: null, shake_ids: [2], shake_all: false },
   res: MSG, status: '201 (재전송도 201)',
-  errors: [['bad_request', 400, '메시지를 입력해 주세요 / 2000자까지 / temp_id 가 없어요 / 이 아지트에 없는 사람을 불렀어요 / 답장할 메시지가 이 방에 없어요'], ['temp_id_conflict', 409, '(같은 번호표인데 본문이 다름)'], ['not_found', 404, '방이 없어요']],
-  notes: ['@ 는 서버가 본문을 파싱하지 않아요. 앱이 @칩으로 고른 사람 id 를 <code>shake_ids</code>로 보내요 (닉네임은 바뀌고 겹칠 수 있어서).', '@로 부르면 = 흔들기. 방해 금지·횟수 제한 없음.', '<code>shake_all</code> = @전체. 온라인인 전원을 흔들어요 (사람별 줄은 안 만듦).', '같은 사람을 두 번 넣어도 한 번으로 쳐요.', '사진·짤 메시지(<code>kind</code> photo, meme)는 나중에.'],
+  extra: [
+    ['사진 보내기 (POST /v1/uploads kind=photo → R2 PUT → 여기)', { temp_id: '…', kind: 'photo', photo_key: 'photos/1/ABCD….webp' }],
+    ['짤 보내기', { temp_id: '…', kind: 'meme', meme_id: 5 }],
+    ['사진·짤 응답 (body 는 비우고 그림은 media_url)', Object.assign({}, MSG, { kind: 'meme', body: '', meme_id: 5, media_url: 'https://…(R2 보기 링크, 24시간)', shake_ids: [], reactions: [] })],
+  ],
+  errors: [['bad_request', 400, '메시지를 입력해 주세요 / 2000자까지 / temp_id 가 없어요 / 이 아지트에 없는 사람을 불렀어요 / 답장할 메시지가 이 방에 없어요 / 내 사진이 아니에요 / 업로드가 아직 안 끝났어요 / 아지트에 없는 짤이에요 / 보낼 수 없는 메시지 종류예요'], ['temp_id_conflict', 409, '(같은 번호표인데 내용이 다름)'], ['not_found', 404, '방이 없어요']],
+  notes: ['@ 는 서버가 본문을 파싱하지 않아요. 앱이 @칩으로 고른 사람 id 를 <code>shake_ids</code>로 보내요 (닉네임은 바뀌고 겹칠 수 있어서).', '@로 부르면 = 흔들기. 방해 금지·횟수 제한 없음.', '<code>shake_all</code> = @전체. 온라인인 전원을 흔들어요 (사람별 줄은 안 만듦).', '같은 사람을 두 번 넣어도 한 번으로 쳐요.', '사진: <code>photo_key</code>는 내가 올린 <code>photos/{내 id}/</code> 키만, R2 에 다 올라간 것만.', '짤: 이 아지트의 지우지 않은 짤만. DB 엔 그 짤의 R2 키를 같이 남겨서, 나중에 짤 모음에서 빼도 이미 보낸 메시지는 보여요.', '사진·짤 메시지는 고칠 수 없고 지우기만 돼요.'],
   go: ['메시지 + shakes 줄을 <code>db.Transaction</code> 하나로. 하나라도 실패하면 둘 다 롤백.', '<code>UNIQUE(sender_id, temp_id)</code>.', '커밋이 끝난 <b>다음에</b> 웹소켓으로 배달 (커밋 전에 보내면 롤백됐는데 화면엔 뜨는 사고).'] },
 
 { id: 'messages-patch', st: 'done', name: '내 메시지 고치기', method: 'PATCH', path: '/v1/azits/{azit_id}/messages/{message_id}', domain: '메시지', mvp: 'MVP 1', auth: '세션 · 보낸 본인',
@@ -407,7 +412,7 @@ const E = [
 { id: 'uploads', st: 'done', name: '올릴 주소 받기', method: 'POST', path: '/v1/uploads', domain: '사진·짤', mvp: 'MVP 1', auth: '세션',
   screens: 'me 사진·배너, 아지트 배너, 짤 올리기', desc: '서버가 R2 presigned PUT 주소를 줘요 (10분). 앱(Go 쪽)이 그 주소로 직접 PUT 하고, 받은 <code>key</code>를 다음 API 에 넘겨요.',
   body: { kind: 'meme', content_type: 'image/gif', size: 482113 }, res: { key: 'memes/1/ABCD….gif', url: 'https://…(PUT 주소)' }, status: '200',
-  notes: ['kind: avatar, banner, azit_banner (5MB, png/jpg/webp), meme (10MB, gif 도 됨).'] },
+  notes: ['kind: avatar, banner, azit_banner (5MB, png/jpg/webp), photo (채팅 사진, 10MB, png/jpg/webp), meme (10MB, gif 도 됨).'] },
 
 { id: 'memes-list', st: 'done', name: '짤 모음', method: 'GET', path: '/v1/azits/{azit_id}/memes', domain: '사진·짤', mvp: 'MVP 1', auth: '세션',
   screens: 'chat-sticker, set-stickers', desc: '아지트 공동 짤. 최신 순, 지운 건 빼고.',
