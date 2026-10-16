@@ -5,6 +5,7 @@ import {
 } from '../../api/server'
 import type { ReactOption, Reaction, Room, UserMessage } from '../../api/types'
 import { newTempId, toRows, type Me, type Outgoing } from '../../lib/chat'
+import { DeleteMessageModal } from './ChatModals'
 import { ChatView } from './ChatView'
 
 const POLL_MS = 3000 // 웹소켓 전까지는 3초마다 새 메시지를 물어본다
@@ -164,14 +165,23 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, canDel
 
   const onToggle = (msg: UserMessage, r: Reaction) => void react(msg, { text: r.text ?? '', meme_id: r.memeId ?? 0 }, !!r.on)
 
-  const onDelete = async (msg: UserMessage) => {
-    if (!window.confirm('이 메시지를 지울까요? 모두에게서 지워져요')) return
-    const id = Number(msg.id)
+  // 지우기: 먼저 확인 창을 띄우고(confirm 은 데스크톱 웹뷰에서 안 뜰 수 있어서 직접 만든 창), 지우기를 누르면 서버에 지운다
+  const [deleting, setDeleting] = useState<UserMessage>()
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const onDelete = (msg: UserMessage) => setDeleting(msg)
+  const confirmDelete = async () => {
+    if (!deleting) return
+    const id = Number(deleting.id)
+    setDeleteBusy(true)
     try {
       await deleteMessage(azitId, id)
       setMessages((cur) => cur.map((m) => (m.message_id === id ? { ...m, deleted: true, body: '', reactions: [] } : m)))
+      setError(undefined)
     } catch (e) {
       setError(errorText(e))
+    } finally {
+      setDeleteBusy(false)
+      setDeleting(undefined)
     }
   }
 
@@ -183,6 +193,7 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, canDel
   const rows = useMemo(() => toRows(messages, outgoing, me, lastReadId), [messages, outgoing, me, lastReadId])
 
   return (
+    <>
     <ChatView
       room={room}
       memberCount={memberCount}
@@ -206,5 +217,7 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, canDel
         onCancelEdit: () => { setEditing(undefined); setDraft('') },
       }}
     />
+    {deleting && <DeleteMessageModal busy={deleteBusy} onCancel={() => setDeleting(undefined)} onConfirm={() => void confirmDelete()} />}
+    </>
   )
 }

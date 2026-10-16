@@ -75,14 +75,14 @@ export function ImageModal({ src }: { src: string }) {
 }
 
 // 내 메시지 지우기 확인
-export function DeleteMessageModal() {
+export function DeleteMessageModal({ busy, onCancel, onConfirm }: { busy?: boolean; onCancel?: () => void; onConfirm?: () => void }) {
   return (
-    <Modal>
+    <Modal onClose={onCancel}>
       <h2 className="disp modal-title">이 메시지를 지울까요?</h2>
       <p className="modal-text">모두의 화면에서 "지운 메시지"로 바뀌어요. 되돌릴 수 없어요.</p>
       <div className="modal-actions">
-        <button type="button" className="btn sec">취소</button>
-        <button type="button" className="btn dgs">지우기</button>
+        <button type="button" className="btn sec" onClick={onCancel}>취소</button>
+        <button type="button" className="btn dgs" disabled={busy} onClick={onConfirm}>{busy ? '지우는 중…' : '지우기'}</button>
       </div>
     </Modal>
   )
