@@ -72,15 +72,16 @@ func (h *Handler) SendMessage(c fiber.Ctx) error {
 	if err := ValidateTempID(req.TempID); err != nil {
 		return badRequest(err)
 	}
-	if err := ValidateBody(req.Body); err != nil {
-		return badRequest(err)
+	kind, body, memeID, err := h.content(c, me, req)
+	if err != nil {
+		return err
 	}
 
 	// 4. 재전송인지 먼저 본다. 검사를 다 통과한 다음에 보는 이유:
 	//    처음 보낼 때도 같은 검사를 통과했을 테니, 재전송이면 여기까지 똑같이 온다.
 	old, err := h.repo.FindByTempID(ctx, me.AccountID, req.TempID)
 	if err == nil {
-		if old.Body != req.Body {
+		if old.Kind != kind || old.Body != body {
 			return httperr.New(fiber.StatusConflict, proto.ErrCodeTempIDConflict, "같은 temp_id 로 다른 메시지가 이미 저장돼 있어요")
 		}
 		return h.respondOne(c, fiber.StatusCreated, me, old)
@@ -119,8 +120,9 @@ func (h *Handler) SendMessage(c fiber.Ctx) error {
 		RoomID:    rm.RoomID,
 		SenderID:  me.AccountID,
 		TempID:    req.TempID,
-		Kind:      KindText, // 사진/짤 메시지는 나중에. 지금은 글자만
-		Body:      req.Body,
+		Kind:      kind,
+		Body:      body,
+		MemeID:    memeID,
 		ReplyToID: req.ReplyToID,
 		ShakeAll:  req.ShakeAll,
 	}
@@ -134,6 +136,44 @@ func (h *Handler) SendMessage(c fiber.Ctx) error {
 	}
 
 	return h.respondOne(c, fiber.StatusCreated, me, m)
+}
+
+// content 는 요청 종류에 따라 저장할 종류, 본문, 짤 id 를 정한다.
+//   - text:  본문 그대로 (1~2000자)
+//   - photo: 내가 올린 photos/ 키여야 하고, R2 에 다 올라가 있어야 한다. 본문에 키를 저장
+//   - meme:  이 아지트의 지우지 않은 짤이어야 한다. 본문에 그 짤의 R2 키를 저장
+func (h *Handler) content(c fiber.Ctx, me member.Member, req proto.SendMessageRequest) (Kind, string, int64, error) {
+	ctx := c.Context()
+	switch Kind(req.Kind) {
+	case "", KindText:
+		if err := ValidateBody(req.Body); err != nil {
+			return "", "", 0, badRequest(err)
+		}
+		return KindText, req.Body, 0, nil
+
+	case KindPhoto:
+		if !storage.OwnedBy(req.PhotoKey, storage.KindPhoto, me.AccountID) {
+			return "", "", 0, badRequest(errors.New("내 사진이 아니에요"))
+		}
+		if _, _, err := h.r2.Head(ctx, req.PhotoKey); err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return "", "", 0, badRequest(errors.New("업로드가 아직 안 끝났어요"))
+			}
+			return "", "", 0, err
+		}
+		return KindPhoto, req.PhotoKey, 0, nil
+
+	case KindMeme:
+		m, err := h.memeRepo.FindActive(ctx, me.AzitID, req.MemeID)
+		if errors.Is(err, meme.ErrNotFound) {
+			return "", "", 0, badRequest(errors.New("아지트에 없는 짤이에요"))
+		}
+		if err != nil {
+			return "", "", 0, err
+		}
+		return KindMeme, m.MediaKey, m.MemeID, nil
+	}
+	return "", "", 0, badRequest(errors.New("보낼 수 없는 메시지 종류예요"))
 }
 
 // ListMessages 는 방 메시지 목록. 멤버면 누구나. GET /v1/azits/{id}/rooms/{roomId}/messages?before=&limit=

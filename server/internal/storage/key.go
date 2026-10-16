@@ -14,6 +14,7 @@ const (
 	KindAvatar Kind = "avatar"
 	KindBanner Kind = "banner"
 	KindMeme   Kind = "meme"
+	KindPhoto  Kind = "photo" // 채팅에 보내는 사진
 
 	KindAzitBanner Kind = "azit_banner" // 아지트 배너. 내 프로필 배너(KindBanner)와 폴더가 다르다
 )
@@ -48,6 +49,7 @@ var rules = map[Kind]rule{
 	KindAvatar: {prefix: "avatars", maxSize: 5 << 20, exts: imageExts},
 	KindBanner: {prefix: "banners", maxSize: 5 << 20, exts: imageExts},
 	KindMeme:   {prefix: "memes", maxSize: 10 << 20, exts: memeExts},
+	KindPhoto:  {prefix: "photos", maxSize: 10 << 20, exts: imageExts},
 
 	KindAzitBanner: {prefix: "azit-banners", maxSize: 5 << 20, exts: imageExts},
 }

@@ -6,7 +6,10 @@ import "time"
 // 보낸 사람은 토큰에서 정하므로 보내지 않는다.
 type SendMessageRequest struct {
 	TempID    string  `json:"temp_id"`     // 앱이 메시지마다 한 번 만든 UUID. 재전송해도 같은 값이라 중복 저장을 막는다
-	Body      string  `json:"body"`        // 1~2000자
+	Kind      string  `json:"kind"`        // text(생략해도 text), photo, meme
+	Body      string  `json:"body"`        // text 면 1~2000자. photo, meme 이면 안 씀
+	PhotoKey  string  `json:"photo_key"`   // photo 면 POST /v1/uploads (kind=photo) 로 올린 R2 키
+	MemeID    int64   `json:"meme_id"`     // meme 이면 이 아지트 짤 id
 	ReplyToID *int64  `json:"reply_to_id"` // 답장이면 원래 메시지 id. 아니면 생략
 	ShakeIDs  []int64 `json:"shake_ids"`   // @로 부른 사람들의 account id. 앱이 @칩을 고를 때 모은다. 없으면 생략
 	ShakeAll  bool    `json:"shake_all"`   // @전체 를 썼는지
@@ -25,7 +28,9 @@ type MessageResponse struct {
 	RoomID    int64              `json:"room_id"`
 	TempID    string             `json:"temp_id"`     // 앱이 "보내는 중" 말풍선을 이 값으로 찾아 바꾼다
 	Kind      string             `json:"kind"`        // text, photo, meme, system
-	Body      string             `json:"body"`        // 지운 메시지면 ""
+	Body      string             `json:"body"`        // 지운 메시지면 "". photo, meme 이면 ""
+	MemeID    int64              `json:"meme_id"`     // meme 이면 짤 id, 아니면 0
+	MediaURL  string             `json:"media_url"`   // photo, meme 이면 그림 보기 링크. 아니거나 지웠으면 ""
 	ReplyToID *int64             `json:"reply_to_id"` // 답장 아니면 null
 	ShakeIDs  []int64            `json:"shake_ids"`   // @로 불린 사람들. 없으면 [] (내가 들어있으면 앱이 흔든다)
 	ShakeAll  bool               `json:"shake_all"`   // @전체 였는지

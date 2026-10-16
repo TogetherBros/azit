@@ -55,8 +55,12 @@ func (h *Handler) toResponses(ctx context.Context, me member.Member, messages []
 	// 3. 메시지마다 붙이기
 	res := make([]proto.MessageResponse, 0, len(messages))
 	for _, m := range messages {
-		res = append(res, toResponse(m, shakes[m.MessageID], senders[m.SenderID],
-			groupReactions(reactions[m.MessageID], me.AccountID, memeURLs)))
+		r := toResponse(m, shakes[m.MessageID], senders[m.SenderID],
+			groupReactions(reactions[m.MessageID], me.AccountID, memeURLs))
+		if r.MediaURL, err = h.mediaURL(ctx, m); err != nil {
+			return nil, err
+		}
+		res = append(res, r)
 	}
 	return res, nil
 }
@@ -119,6 +123,15 @@ func (h *Handler) memeURLs(ctx context.Context, reactions map[int64][]Reaction) 
 	return out, nil
 }
 
+// mediaURL 은 사진·짤 메시지의 그림 보기 링크. 글자 메시지나 지운 메시지면 "".
+// 링크 만들기는 서명만 하고 네트워크를 안 타서 메시지마다 불러도 된다.
+func (h *Handler) mediaURL(ctx context.Context, m Message) (string, error) {
+	if m.DeletedAt != nil || (m.Kind != KindPhoto && m.Kind != KindMeme) || m.Body == "" {
+		return "", nil
+	}
+	return h.r2.PresignGet(ctx, m.Body)
+}
+
 // groupReactions 는 맞장구 줄들(한 사람 한 줄)을 종류별로 묶는다: "ㅋㅋ" 줄 3개 → {ㅋㅋ, count 3}.
 // 순서는 그 종류가 처음 달린 순서. 내가 단 종류는 Mine = true.
 func groupReactions(rows []Reaction, meID int64, memeURLs map[int64]string) []proto.ReactionResponse {
@@ -149,6 +162,9 @@ func groupReactions(rows []Reaction, meID int64, memeURLs map[int64]string) []pr
 func toResponse(m Message, shakeIDs []int64, sender *proto.SenderResponse, reactions []proto.ReactionResponse) proto.MessageResponse {
 	deleted := m.DeletedAt != nil
 	body := m.Body
+	if m.Kind == KindPhoto || m.Kind == KindMeme {
+		body = "" // 본문엔 R2 키가 들어 있다. 앱엔 media_url 로 준다
+	}
 	if deleted {
 		body = ""
 		shakeIDs = nil
@@ -167,6 +183,7 @@ func toResponse(m Message, shakeIDs []int64, sender *proto.SenderResponse, react
 		TempID:    m.TempID,
 		Kind:      string(m.Kind),
 		Body:      body,
+		MemeID:    m.MemeID,
 		ReplyToID: m.ReplyToID,
 		ShakeIDs:  shakeIDs,
 		ShakeAll:  m.ShakeAll && !deleted,

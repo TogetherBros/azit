@@ -22,6 +22,7 @@ type Message struct {
 	TempID    string `gorm:"not null;uniqueIndex:idx_sender_temp,priority:2"` // 앱이 만든 번호표. 같은 사람 + 같은 번호표면 재전송
 	Kind      Kind   `gorm:"not null;default:'text'"`
 	Body      string `gorm:"not null"`
+	MemeID    int64  `gorm:"not null;default:0"` // 짤 메시지면 보낸 짤 id. Body 에는 그때의 R2 키를 같이 남긴다 (짤을 빼도 메시지는 보이게)
 	ReplyToID *int64 // 답장이면 원래 메시지 id
 	ShakeAll  bool   `gorm:"not null;default:false"` // @전체 로 불렀는지 (온라인인 전원을 흔든다). 사람별은 Shake 테이블
 	CreatedAt time.Time
