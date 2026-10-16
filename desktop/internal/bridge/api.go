@@ -34,10 +34,10 @@ func (s *APIService) Call(ctx context.Context, method, path string, body any) (a
 	return out, err
 }
 
-// Upload 는 사진 하나를 R2 에 올리고 key 를 돌려준다. kind 는 "meme" 이나 "azit_banner".
-// 받은 key 는 짤 등록(POST /v1/azits/{id}/memes)이나 아지트 만들기에 넣는다.
+// Upload 는 사진 하나를 R2 에 올리고 key 를 돌려준다. kind 는 "meme", "photo", "azit_banner".
+// 받은 key 는 짤 등록(POST /v1/azits/{id}/memes), 사진 메시지 보내기, 아지트 만들기에 넣는다.
 func (s *APIService) Upload(ctx context.Context, kind, contentType, dataBase64 string) (string, error) {
-	if kind != "meme" && kind != "azit_banner" {
+	if kind != "meme" && kind != "photo" && kind != "azit_banner" {
 		return "", fmt.Errorf("알 수 없는 사진 종류예요: %s", kind)
 	}
 	return upload(ctx, s.api, s.auth, kind, contentType, dataBase64)

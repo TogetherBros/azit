@@ -113,6 +113,7 @@ export function AzitScreen({ azit, me, onBack, onChanged, onLeft }: Props) {
           memberCount={azit.member_count}
           me={me}
           reactOptions={reactOptions}
+          memes={memes}
           canDeleteOthers={admin}
           onRead={loadRooms}
           onShaken={shake}

@@ -52,7 +52,9 @@ export type MessageRes = {
   room_id: number
   temp_id: string
   kind: 'text' | 'photo' | 'meme' | 'system'
-  body: string
+  body: string // photo, meme 이면 ""
+  meme_id: number // meme 이면 짤 id
+  media_url: string // photo, meme 이면 그림 보기 링크
   reply_to_id: number | null
   shake_ids: number[]
   shake_all: boolean
@@ -112,7 +114,16 @@ export const reorderRooms = (azitId: number, roomIds: number[]) =>
 export const listMessages = (azitId: number, roomId: number, before?: number, limit = 50) =>
   call<MessageList>('GET', `/v1/azits/${azitId}/rooms/${roomId}/messages?limit=${limit}${before ? `&before=${before}` : ''}`)
 
-export type SendInput = { temp_id: string; body: string; shake_ids?: number[]; shake_all?: boolean }
+// 글자: body · 사진: kind 'photo' + photo_key (uploadFile('photo') 로 받은 키) · 짤: kind 'meme' + meme_id
+export type SendInput = {
+  temp_id: string
+  kind?: 'text' | 'photo' | 'meme'
+  body?: string
+  photo_key?: string
+  meme_id?: number
+  shake_ids?: number[]
+  shake_all?: boolean
+}
 
 export const sendMessage = (azitId: number, roomId: number, input: SendInput) =>
   call<MessageRes>('POST', `/v1/azits/${azitId}/rooms/${roomId}/messages`, input)
@@ -159,8 +170,8 @@ export const listReacts = (azitId: number) => call<ReactRes[]>('GET', `/v1/azits
 export const replaceReacts = (azitId: number, reacts: ReactItem[]) =>
   call<ReactRes[]>('PUT', `/v1/azits/${azitId}/reacts`, { reacts })
 
-// 사진을 R2 에 올리고 key 를 받는다 (짤, 아지트 배너)
-export const uploadFile = (kind: 'meme' | 'azit_banner', contentType: string, base64: string) =>
+// 사진을 R2 에 올리고 key 를 받는다 (짤, 채팅 사진, 아지트 배너)
+export const uploadFile = (kind: 'meme' | 'photo' | 'azit_banner',contentType: string, base64: string) =>
   APIService.Upload(kind, contentType, base64)
 
 /* ---------- 오류 ---------- */

@@ -6,7 +6,28 @@ import type { ChatRow, MessagePart, Reaction, UserMessage } from '../api/types'
 const GROUP_GAP = 5 * 60 * 1000 // 같은 사람이 5분 안에 이어 보내면 한 묶음
 
 // 아직 서버에 안 간 내 메시지 (보내는 중 · 못 보냄)
-export type Outgoing = { tempId: string; body: string; at: number; failed?: boolean; shakeAll?: boolean }
+// 사진·짤은 kind 와 미리 보여 줄 src 를 같이 들고 있다 (사진은 올린 뒤 photoKey 가 생긴다)
+export type Outgoing = {
+  tempId: string
+  body: string
+  at: number
+  failed?: boolean
+  shakeAll?: boolean
+  kind?: 'text' | 'photo' | 'meme'
+  src?: string // 보내는 동안 보여 줄 그림 (사진은 로컬 미리보기, 짤은 짤 링크)
+  name?: string // 짤 이름
+  memeId?: number
+  photoKey?: string
+  file?: File // 아직 못 올린 사진 (다시 보내기 때 다시 올린다)
+}
+
+type Content = { kind: 'text'; parts: MessagePart[] } | { kind: 'image'; src: string } | { kind: 'sticker'; src: string; name: string }
+
+function content(kind: string, body: string, shakeAll: boolean, src: string, name: string): Content {
+  if (kind === 'photo') return { kind: 'image', src }
+  if (kind === 'meme') return { kind: 'sticker', src, name }
+  return { kind: 'text', parts: toParts(body, shakeAll) }
+}
 
 export type Me = { id: number; nick: string; color: string; src?: string }
 
@@ -21,7 +42,7 @@ export function toRows(messages: MessageRes[], outgoing: Outgoing[], me: Me, las
       senderId: m.sender.account_id,
       id: m.message_id,
       msg: {
-        kind: 'text',
+        ...content(m.kind, m.body, m.shake_all, m.media_url, '짤'),
         id: String(m.message_id),
         author: { id: String(m.sender.account_id), nick: m.sender.nickname, color: m.sender.color, src: m.sender.avatar_url || undefined },
         time: '',
@@ -29,7 +50,6 @@ export function toRows(messages: MessageRes[], outgoing: Outgoing[], me: Me, las
         deleted: m.deleted,
         edited: !!m.edited_at && !m.deleted,
         shookMe: !mine && (m.shake_all || m.shake_ids.includes(me.id)),
-        parts: toParts(m.body, m.shake_all),
         reactions: m.reactions.map(toReaction),
       },
     })
@@ -44,14 +64,13 @@ export function toRows(messages: MessageRes[], outgoing: Outgoing[], me: Me, las
       senderId: me.id,
       id: Number.MAX_SAFE_INTEGER,
       msg: {
-        kind: 'text',
+        ...content(o.kind ?? 'text', o.body, !!o.shakeAll, o.src ?? '', o.name ?? '짤'),
         id: o.tempId,
         author: { id: String(me.id), nick: me.nick, color: me.color, src: me.src },
         time: '',
         mine: true,
         pending: !o.failed,
         failed: o.failed,
-        parts: toParts(o.body, !!o.shakeAll),
       },
     })
   }

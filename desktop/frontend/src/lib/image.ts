@@ -13,16 +13,18 @@ const BANNER_W = 1440
 const BANNER_H = 600
 
 const MEME_SIDE = 512
+const PHOTO_SIDE = 1600
 
-// avatar: 정사각형 자르기, banner·azit_banner: 12:5 자르기, meme: 자르지 않고 긴 변 512px 로 줄이기
-export async function shrinkImage(file: File, kind: 'avatar' | 'banner' | 'azit_banner' | 'meme'): Promise<ShrunkImage> {
+// avatar: 정사각형 자르기, banner·azit_banner: 12:5 자르기,
+// meme·photo: 자르지 않고 긴 변을 줄이기 (짤 512px, 채팅 사진 1600px)
+export async function shrinkImage(file: File, kind: 'avatar' | 'banner' | 'azit_banner' | 'meme' | 'photo'): Promise<ShrunkImage> {
   const img = await loadImage(file)
 
   let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight
   let dw: number, dh: number
 
-  if (kind === 'meme') {
-    const scale = Math.min(1, MEME_SIDE / Math.max(sw, sh))
+  if (kind === 'meme' || kind === 'photo') {
+    const scale = Math.min(1, (kind === 'meme' ? MEME_SIDE : PHOTO_SIDE) / Math.max(sw, sh))
     dw = Math.round(sw * scale)
     dh = Math.round(sh * scale)
   } else if (kind === 'avatar') {

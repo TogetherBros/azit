@@ -66,9 +66,9 @@ export function PollModal({ question = '', options }: PollProps) {
   )
 }
 
-export function ImageModal({ src }: { src: string }) {
+export function ImageModal({ src, onClose }: { src: string; onClose?: () => void }) {
   return (
-    <Modal title="사진">
+    <Modal title="사진" onClose={onClose}>
       <img src={src} alt="사진" style={{ borderRadius: 16 }} />
     </Modal>
   )
