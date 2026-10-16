@@ -341,15 +341,11 @@
 .rx-cell.on { border-color: var(--lime); }
 .rx-cell.cur { border-style: dashed; border-color: var(--lime); }
 .rx-count { font-size: 12px; color: var(--mu); margin-right: auto; }
+/* 칸이 좁으면 "목록에 넣기" 버튼이 밖으로 삐져나가지 않고 다음 줄로 내려간다 */
+.rx-row { gap: 10px; }
+.rx-add { flex-shrink: 0; white-space: nowrap; }
 .rx-err { font-size: 12px; color: var(--red); }
 .rx-full { color: var(--pink); }
-.chip:disabled { opacity: .35; text-decoration: line-through; }
-.rx-ctx { display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
-.rx-ctx-cap { font-size: 11px; color: var(--mu); }
-.rx-ctx-av { width: 30px; height: 30px; border-radius: 10px; flex-shrink: 0; color: var(--on-accent); font-weight: 800; font-size: 12px; display: flex; align-items: center; justify-content: center; }
-.rx-ctx .bub { font-size: 13px; }
-.rx-new { animation: rx-pop .5s ease-out; }
-@keyframes rx-pop { 0% { transform: scale(.6); } 70% { transform: scale(1.12); } 100% { transform: scale(1); } }
 .rx-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 .rx-tile {
   position: relative; height: 96px; border-radius: 16px; background: var(--s2);
@@ -369,7 +365,12 @@
 .rx-tools { position: absolute; bottom: 6px; display: none; gap: 2px; padding: 2px; border-radius: 10px; background: var(--s1); }
 .rx-tile:hover .rx-tools, .rx-tile:focus-within .rx-tools { display: flex; }
 .rx-tools .btn { width: 24px; height: 24px; background: transparent; }
-.rx-tools .btn.del { color: var(--red); }
+/* 칸 오른쪽 위 x: 누르면 "지울까요?" 창 */
+.rx-x {
+  position: absolute; top: 6px; right: 6px; width: 20px; height: 20px; border-radius: 10px; border: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center; background: var(--s1); color: var(--mu); cursor: pointer;
+}
+.rx-x:hover { background: var(--red); color: #fff; }
 @media (max-width: 760px) { .rx-lab { flex-direction: column; } .rx-stage { flex-basis: 170px; } .rx-grid { grid-template-columns: repeat(4, 1fr); } }
 
 /* 홈: 초대 코드 확인 뒤 미리보기 */
