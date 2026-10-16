@@ -4,7 +4,7 @@ import {
   type ImageKind, type Me, type ProfileFields,
 } from '../../api/profile'
 import {
-  createAzit, createRoom, errorText, joinInvite, listAzits, previewInvite,
+  createAzit, errorText, joinInvite, listAzits, previewInvite,
   type AzitRes, type InvitePreview,
 } from '../../api/server'
 import { Rail } from '../../app/Rail'
@@ -87,12 +87,11 @@ export function MeScreen({ onLogout }: Props) {
     setView(id)
   }
 
-  // 새 아지트: 만들고 고른 기본 방도 같이 만든 뒤 그 아지트로
+  // 새 아지트: 만들고 그 아지트로 (방은 서버가 기본 방 하나만 만든다)
   const create = async (a: NewAzit) => {
     setHomeBusy(true)
     try {
       const made = await createAzit(a.name, a.color)
-      for (const p of a.presets) await createRoom(made.azit_id, p).catch(() => {})
       await loadAzits()
       setCreateError(undefined)
       setView(made.azit_id)
