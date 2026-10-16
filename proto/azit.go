@@ -15,4 +15,6 @@ type AzitResponse struct {
 	Color       string `json:"color"`
 	BannerURL   string `json:"banner_url"` // 없으면 ""
 	MemberCount int64  `json:"member_count"`
+	MyRole      string `json:"my_role"`     // 이 아지트에서 내 역할: super_admin, admin, member. 초대 미리보기처럼 아직 멤버가 아니면 ""
+	MyNickname  string `json:"my_nickname"` // 이 아지트 안 내 닉네임. 멤버가 아니면 ""
 }

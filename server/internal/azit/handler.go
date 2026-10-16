@@ -86,6 +86,8 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		Color:       a.Color,
 		BannerURL:   bannerURL,
 		MemberCount: 1,
+		MyRole:      string(member.RoleSuperAdmin),
+		MyNickname:  input.Nickname,
 	})
 }
 
@@ -118,12 +120,20 @@ func (h *Handler) List(c fiber.Ctx) error {
 			return err
 		}
 
+		// 내 역할·닉네임. 들어간 아지트는 몇 개 안 돼서 하나씩 읽는다.
+		me, err := h.memberRepo.FindActive(ctx, a.AzitID, accountID)
+		if err != nil {
+			return err
+		}
+
 		res = append(res, proto.AzitResponse{
 			AzitID:      a.AzitID,
 			Name:        a.Name,
 			Color:       a.Color,
 			BannerURL:   bannerURL,
 			MemberCount: counts[a.AzitID],
+			MyRole:      string(me.Role),
+			MyNickname:  me.NickName,
 		})
 	}
 
