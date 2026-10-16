@@ -16,11 +16,12 @@ type Props = {
   onDelete?: (msg: UserMessage) => void
   onRetry?: (msg: UserMessage) => void
   onImage?: (src: string) => void // 사진 크게 보기
+  onProfile?: (accountId: string) => void // 아바타·이름 누르기 → 프로필
   canDelete?: boolean // 남의 메시지도 지울 수 있는지 (관리자)
 }
 
 // 메시지 한 줄. 시스템 메시지(입장, 흔들기 알림)는 가운데 알약 모양.
-export function MessageItem({ msg, cont, showTime, reactOptions, memeOptions = [], onReact, onToggle, onEdit, onDelete, onRetry, onImage, canDelete }: Props) {
+export function MessageItem({ msg, cont, showTime, reactOptions, memeOptions = [], onReact, onToggle, onEdit, onDelete, onRetry, onImage, onProfile, canDelete }: Props) {
   const [picker, setPicker] = useState<HTMLElement | null>(null) // 열린 맞장구 고르기 창의 기준 버튼
   const closePicker = useCallback(() => setPicker(null), [])
 
@@ -47,7 +48,7 @@ export function MessageItem({ msg, cont, showTime, reactOptions, memeOptions = [
       {!mine && (cont
         ? <span className="msg-av-gap" />
         : (
-          <button type="button" className="plain" style={{ flexShrink: 0 }} aria-label={`${author.nick} 프로필`}>
+          <button type="button" className="plain" style={{ flexShrink: 0 }} aria-label={`${author.nick} 프로필`} onClick={onProfile && (() => onProfile(author.id))}>
             <Avatar name={author.nick} color={author.color} size={34} src={author.src} />
           </button>
         ))}
@@ -55,7 +56,7 @@ export function MessageItem({ msg, cont, showTime, reactOptions, memeOptions = [
       <div className="msg-col">
         {!mine && !cont && (
           <span className="msg-name">
-            <button type="button" className="plain">{author.nick}</button>
+            <button type="button" className="plain" onClick={onProfile && (() => onProfile(author.id))}>{author.nick}</button>
             {author.title && <span className="msg-title">{author.title}</span>}
           </span>
         )}

@@ -4,7 +4,7 @@ import { Icon } from '../../components/Icon'
 import { Composer } from './Composer'
 import { MessageItem } from './MessageItem'
 
-type ItemHandlers = Pick<Parameters<typeof MessageItem>[0], 'onReact' | 'onToggle' | 'onEdit' | 'onDelete' | 'onRetry' | 'onImage' | 'canDelete' | 'memeOptions'>
+type ItemHandlers = Pick<Parameters<typeof MessageItem>[0], 'onReact' | 'onToggle' | 'onEdit' | 'onDelete' | 'onRetry' | 'onImage' | 'onProfile' | 'canDelete' | 'memeOptions'>
 
 type Props = {
   room: Room

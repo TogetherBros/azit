@@ -13,6 +13,7 @@ import { CreateAzitScreen } from '../features/azit/CreateAzitScreen'
 import { KickModal, MemberModal } from '../features/azit/MemberModals'
 import { CodesTab } from '../features/azit/settings/CodesTab'
 import { GeneralTab } from '../features/azit/settings/GeneralTab'
+import { MemberProfileModal } from '../features/azit/MemberProfileModal'
 import { LeaveTab } from '../features/azit/settings/LeaveTab'
 import { LogTab } from '../features/azit/settings/LogTab'
 import { MembersTab } from '../features/azit/settings/MembersTab'
@@ -157,6 +158,16 @@ const SCREENS: Record<string, () => ReactNode> = {
     <App overlay={<RouletteModal title="점심 쏘기" candidates={[...M.MEMBERS.map((m) => m.nick), '떡볶이']} selected={['4n5rud', '김환성', '강백호']} />} />
   ),
   'modal-poll': () => <App overlay={<PollModal question="토요일 몇 시?" options={['오후 2시', '오후 4시', '']} />} />,
+  'modal-profile': () => (
+    <App
+      overlay={(
+        <MemberProfileModal
+          member={{ account_id: 2, name: 'kangbaekho', nickname: '강백호', color: '#7BC4FF', avatar_url: '', banner_url: '', bio: '점심 내기 무패', role: 'admin', joined_at: '2026-09-20T11:02:00Z' }}
+          onClose={() => {}}
+        />
+      )}
+    />
+  ),
   'modal-image': () => <App overlay={<ImageModal src={M.PHOTO_SRC} />} />,
   'modal-delete': () => <App overlay={<DeleteMessageModal />} />,
   'modal-member': () => <App overlay={<MemberModal member={M.KIM} stats={M.KIM_STATS} titleCount={2} roomName="다같이" />} />,
@@ -196,7 +207,7 @@ const SCREENS: Record<string, () => ReactNode> = {
   'app-app': appSettings('app'),
 
   'activity': () => <Bare view="activity" body={<ActivityView items={M.NOTIFS} />} />,
-  'activity-empty': () => <Bare view="activity" body={<ActivityView items={[]} filter="칭호" />} />,
+  'activity-empty': () => <Bare view="activity" body={<ActivityView items={[]} filter="흔들기" />} />,
   'me': () => (
     <App body={<MeView azitShort={AZ.short} profile={M.MY_PROFILE} titles={M.TITLES} />} />
   ),
@@ -215,10 +226,10 @@ const SCREENS: Record<string, () => ReactNode> = {
 
   // 아지트 설정
   'set-general': settings('general', (
-    <GeneralTab azit={AZ} rooms={M.ROOMS} landingId="r1" welcome lastChange="류승엽이 바꿈 · 어제" />
+    <GeneralTab value={{ name: AZ.name, color: AZ.color, desc: AZ.desc ?? '' }} memberCount={AZ.memberCount} />
   )),
   'set-general-error': settings('general', (
-    <GeneralTab azit={AZ} rooms={M.ROOMS} landingId="r1" welcome lastChange="" dirty error="이름은 10분에 한 번 바꿀 수 있어요 · 7분 뒤에" />
+    <GeneralTab value={{ name: AZ.name, color: AZ.color, desc: AZ.desc ?? '' }} memberCount={AZ.memberCount} dirty error="아지트 이름은 20자까지예요" />
   )),
   'set-codes': settings('codes', <CodesTab codes={M.CODES} made={{ code: 'Q9WE2R', left: '24시간 남음', uses: '5번' }} />),
   'set-members': settings('members', <MembersTab members={M.MEMBERS.map((m, i) => ({ ...m, name: m.id, role: i === 0 ? 'super_admin' : i === 2 ? 'admin' : 'member' }))} meId={M.ME.id} myRole="super_admin" />),

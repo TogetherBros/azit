@@ -16,6 +16,7 @@ export type AzitRes = {
   azit_id: number
   name: string
   color: string
+  description: string // 한 줄 소개
   banner_url: string
   member_count: number
   my_role: Role | ''
@@ -75,8 +76,30 @@ export type ReactRes = { react_id: number; text: string; meme_id: number; meme_u
 export type ReactItem = { text: string; meme_id: number }
 
 export type MemberRes = {
-  account_id: number; name: string; nickname: string; color: string; avatar_url: string; bio: string; role: Role; joined_at: string
+  account_id: number; name: string; nickname: string; color: string; avatar_url: string; banner_url: string; bio: string; role: Role; joined_at: string
 }
+
+export type NotificationRes = {
+  notification_id: number
+  kind: 'shake' | 'join' | 'kick'
+  azit_id: number
+  azit_name: string
+  room_id: number // shake 면 그 방
+  room_name: string
+  message_id: number
+  actor_id: number
+  actor_nickname: string
+  preview: string // shake 면 메시지 앞부분
+  read: boolean
+  created_at: string
+}
+
+/* ---------- 알림 ---------- */
+
+export const listNotifications = () =>
+  call<{ notifications: NotificationRes[]; unread: number }>('GET', '/v1/notifications')
+
+export const readAllNotifications = () => call<null>('POST', '/v1/notifications/read-all')
 
 /* ---------- 아지트 · 초대 ---------- */
 
@@ -84,6 +107,11 @@ export const listAzits = () => call<AzitRes[]>('GET', '/v1/azits')
 
 export const createAzit = (name: string, color: string, bannerKey = '') =>
   call<AzitRes>('POST', '/v1/azits', { name, color, banner_key: bannerKey })
+
+// 기본 정보 바꾸기 (관리자 이상). 바꿀 칸만 보낸다. banner_key 가 "" 면 배너를 지운다
+export type AzitPatch = { name?: string; color?: string; description?: string; banner_key?: string }
+
+export const updateAzit = (azitId: number, patch: AzitPatch) => call<AzitRes>('PATCH', `/v1/azits/${azitId}`, patch)
 
 // 코드는 하이픈이 있어도 없어도 된다 (서버가 정리한다)
 export const previewInvite = (code: string) => call<InvitePreview>('GET', `/v1/invites/${encodeURIComponent(code)}`)

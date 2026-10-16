@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   createInvite, createMeme, createRoom, deleteMeme, errorText, isAdmin, kickMember, leaveAzit, listInvites, listMembers, listMemes,
-  listReacts, listRooms, renameRoom, reorderRooms, replaceReacts, revokeInvite, updateMemberRole, updateMyNickname, uploadFile,
-  type AzitRes, type InviteRes, type MemberRes, type MemeRes, type ReactItem, type ReactRes, type RoomRes, type Role,
+  listReacts, listRooms, renameRoom, reorderRooms, replaceReacts, revokeInvite, updateAzit, updateMemberRole, updateMyNickname, uploadFile,
+  type AzitPatch, type AzitRes, type InviteRes, type MemberRes, type MemeRes, type ReactItem, type ReactRes, type RoomRes, type Role,
 } from '../../api/server'
 import type { Azit, InviteCode, Member, ReactOption, Room, Sticker } from '../../api/types'
 import { Shell } from '../../app/Shell'
@@ -11,7 +11,9 @@ import { shrinkImage } from '../../lib/image'
 import { ChatScreen } from '../chat/ChatScreen'
 import { NewRoomModal } from '../rooms/NewRoomModal'
 import { RoomList } from '../rooms/RoomList'
+import { MemberProfileModal } from './MemberProfileModal'
 import { CodesTab, type CodeExpiry } from './settings/CodesTab'
+import { GeneralTab, type GeneralValues } from './settings/GeneralTab'
 import { LeaveTab } from './settings/LeaveTab'
 import { MembersTab } from './settings/MembersTab'
 import { ReactsTab } from './settings/ReactsTab'
@@ -21,7 +23,7 @@ import { StickersTab } from './settings/StickersTab'
 
 const ROOMS_POLL_MS = 5000
 // 서버 API 가 있는 설정 탭만 (기본 정보·변경 기록은 아직 없음)
-const TABS: SettingsTab[] = ['codes', 'members', 'rooms', 'reacts', 'stickers', 'leave']
+const TABS: SettingsTab[] = ['general', 'codes', 'members', 'rooms', 'reacts', 'stickers', 'leave']
 const ROLE_LABEL = { super_admin: '만든 사람', admin: '관리자', member: '멤버', '': '' } as const
 
 type Props = {
@@ -30,12 +32,13 @@ type Props = {
   onBack: () => void
   onChanged?: () => void // 내 닉네임·인원이 바뀌었다 → 아지트 목록 다시 받기
   onLeft?: () => void // 아지트를 나갔다
+  initialRoomId?: number // 처음 열 방 (알림에서 들어올 때). 없거나 이 아지트 방이 아니면 맨 위 방
 }
 
 export const shortName = (name: string) => Array.from(name.trim()).slice(0, 2).join('')
 
 // 아지트 안: 방 목록 + (채팅 | 설정). 방·맞장구 목록·짤은 여기서 받아 아래로 나눠 준다.
-export function AzitScreen({ azit, me, onBack, onChanged, onLeft }: Props) {
+export function AzitScreen({ azit, me, onBack, onChanged, onLeft, initialRoomId }: Props) {
   const azitId = azit.azit_id
   const admin = isAdmin(azit.my_role)
   const [rooms, setRooms] = useState<RoomRes[]>([])
@@ -43,34 +46,32 @@ export function AzitScreen({ azit, me, onBack, onChanged, onLeft }: Props) {
   const [view, setView] = useState<'chat' | SettingsTab>('chat')
   const [reacts, setReacts] = useState<ReactRes[]>([])
   const [memes, setMemes] = useState<MemeRes[]>([])
+  const [members, setMembers] = useState<MemberRes[]>([]) // @ 후보, 메시지 속 @이름 강조
   const [query, setQuery] = useState('')
   const [newRoom, setNewRoom] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
-  const [shaking, setShaking] = useState(false)
 
   const loadRooms = useCallback(() => {
     listRooms(azitId)
       .then((rs) => {
         setRooms(rs)
-        setRoomId((cur) => cur ?? rs[0]?.room_id)
+        const first = rs.some((r) => r.room_id === initialRoomId) ? initialRoomId : rs[0]?.room_id
+        setRoomId((cur) => cur ?? first)
       })
       .catch((e) => setError(errorText(e)))
-  }, [azitId])
+  }, [azitId, initialRoomId])
 
   useEffect(() => {
     setRooms([]); setRoomId(undefined); setView('chat'); setError(undefined)
     loadRooms()
     listReacts(azitId).then(setReacts).catch(() => {})
     listMemes(azitId).then(setMemes).catch(() => {})
+    listMembers(azitId).then(setMembers).catch(() => {})
     const t = window.setInterval(loadRooms, ROOMS_POLL_MS)
     return () => window.clearInterval(t)
   }, [azitId, loadRooms])
 
-  const shake = useCallback(() => {
-    setShaking(true)
-    window.setTimeout(() => setShaking(false), 700)
-  }, [])
 
   // 화면 모양으로 바꾸기
   const az: Azit = { id: String(azitId), name: azit.name, short: shortName(azit.name), color: azit.color, memberCount: azit.member_count, unread: 0 }
@@ -114,9 +115,9 @@ export function AzitScreen({ azit, me, onBack, onChanged, onLeft }: Props) {
           me={me}
           reactOptions={reactOptions}
           memes={memes}
+          members={members}
           canDeleteOthers={admin}
           onRead={loadRooms}
-          onShaken={shake}
         />
       )
       : <div className="main"><div className="page mu" style={{ margin: 'auto' }}>{error ?? '방을 불러오는 중…'}</div></div>
@@ -124,6 +125,7 @@ export function AzitScreen({ azit, me, onBack, onChanged, onLeft }: Props) {
     body = (
       <SettingsView tab={view} tabs={TABS} hint={`내 역할: ${ROLE_LABEL[azit.my_role]}`} onTab={(t) => { setView(t); setError(undefined) }}>
         {view === 'codes' && <Codes azitId={azitId} meId={me.id} readOnly={!admin} />}
+        {view === 'general' && <General key={azitId} azit={azit} readOnly={!admin} onChanged={onChanged} />}
         {view === 'members' && <Members azitId={azitId} meId={me.id} myRole={azit.my_role} onChanged={onChanged} />}
         {view === 'leave' && <Leave azitId={azitId} owner={azit.my_role === 'super_admin'} onLeft={onLeft} />}
         {view === 'rooms' && (
@@ -153,7 +155,8 @@ export function AzitScreen({ azit, me, onBack, onChanged, onLeft }: Props) {
 
   return (
     <>
-      <Shell shaking={shaking}>
+      {/* 흔들기는 MeScreen 이 알림을 보고 창 전체를 흔든다 (다른 방·아지트에 있어도) */}
+      <Shell>
         <RoomList
           azit={az}
           rooms={shown}
@@ -165,7 +168,7 @@ export function AzitScreen({ azit, me, onBack, onChanged, onLeft }: Props) {
           onBack={onBack}
           onRoom={openRoom}
           onQuery={setQuery}
-          onSettings={() => setView(view === 'chat' ? (admin ? 'codes' : 'rooms') : 'chat')}
+          onSettings={() => setView(view === 'chat' ? 'general' : 'chat')}
           onNewRoom={() => { setError(undefined); setNewRoom(true) }}
           onInvite={() => setView('codes')}
         />
@@ -179,6 +182,71 @@ export function AzitScreen({ azit, me, onBack, onChanged, onLeft }: Props) {
 }
 
 /* ---------- 설정 탭들 (서버와 주고받기) ---------- */
+
+// 기본 정보: 고친 값은 여기 들고 있다가 저장 때 바뀐 칸만 보낸다. 배너는 고르는 즉시 올려 두고 키만 기억한다
+function General({ azit, readOnly, onChanged }: { azit: AzitRes; readOnly: boolean; onChanged?: () => void }) {
+  const saved: GeneralValues = { name: azit.name, color: azit.color, desc: azit.description ?? '', banner: azit.banner_url || undefined }
+  const [value, setValue] = useState<GeneralValues>(saved)
+  const [bannerKey, setBannerKey] = useState<string>() // 새로 올린 배너 키
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+  const [done, setDone] = useState(false)
+
+  const patch: AzitPatch = {}
+  if (value.name.trim() !== azit.name) patch.name = value.name
+  if (value.color !== azit.color) patch.color = value.color
+  if (value.desc.trim() !== (azit.description ?? '')) patch.description = value.desc
+  if (bannerKey) patch.banner_key = bannerKey
+  else if (!value.banner && azit.banner_url) patch.banner_key = '' // 배너 빼기
+  const dirty = Object.keys(patch).length > 0
+
+  const pickBanner = async (file: File) => {
+    setBusy(true)
+    try {
+      const img = await shrinkImage(file, 'azit_banner')
+      const key = await uploadFile('azit_banner', img.contentType, img.base64)
+      setBannerKey(key)
+      setValue((v) => ({ ...v, banner: `data:${img.contentType};base64,${img.base64}` }))
+      setError(undefined)
+    } catch (e) {
+      setError(errorText(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const save = async () => {
+    setBusy(true)
+    try {
+      const a = await updateAzit(azit.azit_id, patch)
+      setValue({ name: a.name, color: a.color, desc: a.description, banner: a.banner_url || undefined })
+      setBannerKey(undefined)
+      setError(undefined)
+      setDone(true)
+      onChanged?.() // 아지트 목록을 다시 받아 왼쪽 이름·색도 바뀐다
+    } catch (e) {
+      setError(errorText(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <GeneralTab
+      value={value}
+      memberCount={azit.member_count}
+      readOnly={readOnly}
+      dirty={dirty}
+      busy={busy}
+      error={error}
+      saved={done}
+      onChange={(v) => { setValue(v); if (!v.banner) setBannerKey(undefined); setDone(false) }}
+      onBanner={(f) => void pickBanner(f)}
+      onSave={() => void save()}
+      onReset={() => { setValue(saved); setBannerKey(undefined); setError(undefined) }}
+    />
+  )
+}
 
 function Members({ azitId, meId, myRole, onChanged }: { azitId: number; meId: number; myRole: Role | ''; onChanged?: () => void }) {
   const [members, setMembers] = useState<MemberRes[]>([])
@@ -208,18 +276,24 @@ function Members({ azitId, meId, myRole, onChanged }: { azitId: number; meId: nu
   const views: Member[] = members.map((m) => ({
     id: String(m.account_id), nick: m.nickname, name: m.name, color: m.color, src: m.avatar_url || undefined, role: m.role, joinedAgo: ago(m.joined_at),
   }))
+  const [profileId, setProfileId] = useState<number>()
+  const profile = members.find((m) => m.account_id === profileId)
 
   return (
-    <MembersTab
-      members={views}
-      meId={String(meId)}
-      myRole={myRole || 'member'}
-      busy={busy}
-      error={error}
-      onNick={(nick) => run(() => updateMyNickname(azitId, nick))}
-      onRole={(id, role) => void run(() => updateMemberRole(azitId, Number(id), role))}
-      onKick={(id) => void run(() => kickMember(azitId, Number(id)))}
-    />
+    <>
+      <MembersTab
+        members={views}
+        meId={String(meId)}
+        myRole={myRole || 'member'}
+        busy={busy}
+        error={error}
+        onNick={(nick) => run(() => updateMyNickname(azitId, nick))}
+        onRole={(id, role) => void run(() => updateMemberRole(azitId, Number(id), role))}
+        onKick={(id) => void run(() => kickMember(azitId, Number(id)))}
+        onProfile={(id) => setProfileId(Number(id))}
+      />
+      {profile && <MemberProfileModal member={profile} self={profile.account_id === meId} onClose={() => setProfileId(undefined)} />}
+    </>
   )
 }
 

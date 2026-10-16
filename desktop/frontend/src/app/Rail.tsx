@@ -12,12 +12,13 @@ type Props = {
   meSrc?: string // 내 프사 주소
   onHome?: () => void
   onMe?: () => void
+  onBell?: () => void // 알림
   onAzit?: (id: string) => void
   onAdd?: () => void // + : 코드로 들어가기 · 새 아지트 (홈으로 간다)
 }
 
 // 왼쪽 세로 줄: 로고(= 홈) · 내 아지트들 · [+] · (아래) 알림 · 앱 설정 · 내 정보
-export function Rail({ azits, currentId, me, notifCount, view, meSrc, onHome, onMe, onAzit, onAdd }: Props) {
+export function Rail({ azits, currentId, me, notifCount, view, meSrc, onHome, onMe, onBell, onAzit, onAdd }: Props) {
   return (
     <nav className="rail" aria-label="아지트 목록">
       <button
@@ -58,9 +59,11 @@ export function Rail({ azits, currentId, me, notifCount, view, meSrc, onHome, on
           type="button"
           className={`rbtn sm${view === 'activity' ? ' on' : ''}`}
           aria-label={`알림${notifCount ? ` ${notifCount}개` : ''}`}
+          aria-current={view === 'activity' ? 'page' : undefined}
+          onClick={onBell}
         >
           <Icon name="bell" />
-          {notifCount > 0 && <span className="badge">{notifCount}</span>}
+          {notifCount > 0 && <span className="badge">{notifCount > 99 ? '99+' : notifCount}</span>}
         </button>
         <button type="button" className={`rbtn sm${view === 'settings' ? ' on' : ''}`} aria-label="앱 설정">
           <Icon name="gear" />

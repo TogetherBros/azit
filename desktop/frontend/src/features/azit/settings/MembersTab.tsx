@@ -17,10 +17,11 @@ type Props = {
   onNick?: (nick: string) => Promise<boolean> | void // 성공하면 true → 고치기 칸 닫음
   onRole?: (id: string, role: 'admin' | 'member') => void
   onKick?: (id: string) => void
+  onProfile?: (id: string) => void // 아바타 누르기 → 프로필
 }
 
 // 멤버: 찾기 · 목록. 내 줄에서 아지트 닉네임 바꾸기, 만든 사람은 관리자 올리기·내리기, 관리자 이상은 아래 역할 내보내기.
-export function MembersTab({ members, meId, myRole, error, busy, onNick, onRole, onKick }: Props) {
+export function MembersTab({ members, meId, myRole, error, busy, onNick, onRole, onKick, onProfile }: Props) {
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState(false)
   const [nick, setNick] = useState('')
@@ -51,7 +52,9 @@ export function MembersTab({ members, meId, myRole, error, busy, onNick, onRole,
           const canRole = !self && myRole === 'super_admin' && role !== 'super_admin'
           return (
             <div key={m.id} className="lrow">
-              <Avatar name={m.nick} color={m.color} size={36} src={m.src} />
+              <button type="button" className="plain" style={{ flexShrink: 0 }} aria-label={`${m.nick} 프로필`} onClick={onProfile && (() => onProfile(m.id))}>
+                <Avatar name={m.nick} color={m.color} size={36} src={m.src} />
+              </button>
               <div className="grow col" style={{ gap: 2, minWidth: 0 }}>
                 {self && editing
                   ? (

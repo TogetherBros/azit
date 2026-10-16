@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   addReaction, deleteMessage, editMessage, errorText, listMessages, markRead, removeReaction, sendMessage, uploadFile,
-  type MemeRes, type MessageRes, type SendInput,
+  type MemberRes, type MemeRes, type MessageRes, type SendInput,
 } from '../../api/server'
-import type { ReactOption, Reaction, Room, Sticker, UserMessage } from '../../api/types'
-import { ago, newTempId, toRows, type Me, type Outgoing } from '../../lib/chat'
+import type { Member, ReactOption, Reaction, Room, Sticker, UserMessage } from '../../api/types'
+import { ago, mentionQuery, newTempId, toRows, type Me, type Outgoing } from '../../lib/chat'
 import { shrinkImage } from '../../lib/image'
+import { MemberProfileModal } from '../azit/MemberProfileModal'
 import { DeleteMessageModal, ImageModal } from './ChatModals'
 import { ChatView } from './ChatView'
 import type { ComposerPopup } from './Composer'
@@ -19,13 +20,14 @@ type Props = {
   me: Me
   reactOptions: ReactOption[]
   memes: MemeRes[] // + → 짤 에서 고를 아지트 짤
+  members: MemberRes[] // @ 후보
   canDeleteOthers: boolean // 관리자
   onRead?: () => void // 읽음 처리했으니 방 목록 안 읽은 수를 다시 받으라고
   onShaken?: () => void // 나를 흔든 새 메시지가 왔다
 }
 
 // 방 하나의 채팅. 서버에서 메시지를 받아 ChatView 에 넘기고, 보내기·고치기·지우기·맞장구를 처리한다.
-export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes, canDeleteOthers, onRead, onShaken }: Props) {
+export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes, members, canDeleteOthers, onRead, onShaken }: Props) {
   const roomId = Number(room.id)
   const [messages, setMessages] = useState<MessageRes[]>([])
   const [hasMore, setHasMore] = useState(false)
@@ -131,7 +133,7 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes,
         }
         input = { temp_id: o.tempId, kind: 'photo', photo_key: key }
       } else {
-        input = { temp_id: o.tempId, body: o.body, shake_all: o.shakeAll }
+        input = { temp_id: o.tempId, body: o.body, shake_ids: o.shakeIds, shake_all: o.shakeAll }
       }
       const m = await sendMessage(azitId, roomId, input)
       merge([m])
@@ -156,13 +158,56 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes,
       }
       return
     }
+    // 골라서 넣은 @이름 중 본문에 아직 남아 있는 사람만 흔든다 (넣었다가 지운 건 빼고)
+    const shakeIds = [...new Set(picked.filter((p) => body.includes(`@${p.nick}`)).map((p) => p.id))]
     setDraft('')
-    await deliver({ tempId: newTempId(), body, at: Date.now(), shakeAll: body.includes('@전체') })
+    setPicked([])
+    setMention(null)
+    await deliver({ tempId: newTempId(), body, at: Date.now(), shakeIds, shakeAll: body.includes('@전체') })
+  }
+
+  // @ 부르기 (= 흔들기). "@검색어" 를 치면 후보가 뜨고, 고르면 "@닉네임 " 으로 바꾸고 그 사람 id 를 기억한다
+  const [mention, setMention] = useState<{ query: string; caret: number } | null>(null)
+  const [mentionIndex, setMentionIndex] = useState(0)
+  const [picked, setPicked] = useState<{ id: number; nick: string }[]>([])
+
+  const nicks = useMemo(() => new Map(members.map((m) => [m.account_id, m.nickname])), [members])
+
+  const candidates: (Member & { accountId: number })[] = useMemo(() => {
+    if (!mention) return []
+    const q = mention.query.toLowerCase()
+    const all = { id: 'all', accountId: 0, nick: '전체', color: 'var(--lime)', via: '다같이 흔들기' }
+    const people = members
+      .filter((m) => m.account_id !== me.id)
+      .filter((m) => !q || m.nickname.toLowerCase().includes(q) || m.name.toLowerCase().includes(q))
+      .map((m) => ({ id: String(m.account_id), accountId: m.account_id, nick: m.nickname, color: m.color, src: m.avatar_url || undefined, via: m.name ? `@${m.name}` : '' }))
+    return ('전체'.includes(q) ? [all, ...people] : people).slice(0, 8)
+  }, [mention, members, me.id])
+
+  const onDraft = (v: string, caret: number) => {
+    setDraft(v)
+    if (editing) return
+    const q = mentionQuery(v, caret)
+    if (q === null) { setMention(null); return }
+    if (mention?.query !== q) setMentionIndex(0)
+    setMention({ query: q, caret })
+  }
+
+  const pickMention = (i: number) => {
+    const c = candidates[i]
+    if (!c || !mention) return
+    const start = mention.caret - mention.query.length - 1 // "@" 자리
+    const next = `${draft.slice(0, start)}@${c.nick} ${draft.slice(mention.caret)}`
+    setDraft(next)
+    if (c.accountId) setPicked((ps) => [...ps, { id: c.accountId, nick: c.nick }])
+    setMention(null)
   }
 
   // + 메뉴: 짤 고르기 · 사진 고르기
   const [popup, setPopup] = useState<ComposerPopup>(null)
   const [viewing, setViewing] = useState<string>() // 크게 보는 사진
+  const [profileId, setProfileId] = useState<number>() // 프로필 창을 띄운 멤버
+  const profile = members.find((m) => m.account_id === profileId) // 나간 사람이면 없어서 안 뜬다
 
   const stickers: Sticker[] = useMemo(
     () => memes.map((m) => ({ id: String(m.meme_id), name: m.name, src: m.url, by: '', ago: ago(m.created_at) })),
@@ -240,7 +285,7 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes,
     setDraft(msg.kind === 'text' ? msg.parts.map((p) => ('text' in p ? p.text : `@${p.mention}`)).join('') : '')
   }
 
-  const rows = useMemo(() => toRows(messages, outgoing, me, lastReadId), [messages, outgoing, me, lastReadId])
+  const rows = useMemo(() => toRows(messages, outgoing, me, lastReadId, nicks), [messages, outgoing, me, lastReadId, nicks])
 
   return (
     <>
@@ -259,24 +304,30 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes,
       onDelete={onDelete}
       onRetry={retry}
       onImage={setViewing}
+      onProfile={(id) => setProfileId(Number(id))}
       memeOptions={memeOptions}
       canDelete={canDeleteOthers}
       composer={{
         value: draft,
         editing: !!editing,
-        popup,
+        popup: mention && candidates.length > 0 ? 'mention' : popup,
         stickers,
-        onChange: setDraft,
+        mentionCandidates: candidates,
+        mentionIndex,
+        onChange: onDraft,
+        onMentionMove: (d) => setMentionIndex((i) => (i + d + candidates.length) % candidates.length),
+        onMentionPick: pickMention,
         onSend: () => void send(),
         onCancelEdit: () => { setEditing(undefined); setDraft('') },
-        onPlus: () => setPopup(popup ? null : 'plus'),
-        onPopup: setPopup,
+        onPlus: () => { setMention(null); setPopup(popup ? null : 'plus') },
+        onPopup: (p) => { if (mention) setMention(null); else setPopup(p) },
         onSticker: sendMeme,
         onPhoto: sendPhoto,
       }}
     />
     {deleting && <DeleteMessageModal busy={deleteBusy} onCancel={() => setDeleting(undefined)} onConfirm={() => void confirmDelete()} />}
     {viewing && <ImageModal src={viewing} onClose={() => setViewing(undefined)} />}
+    {profile && <MemberProfileModal member={profile} self={profile.account_id === me.id} onClose={() => setProfileId(undefined)} />}
     </>
   )
 }

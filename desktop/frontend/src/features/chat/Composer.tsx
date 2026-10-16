@@ -17,7 +17,9 @@ type Props = {
   // 진짜 화면에서 쓰는 것 (없으면 미리보기처럼 그리기만)
   value?: string
   editing?: boolean // 내 메시지 고치는 중
-  onChange?: (v: string) => void
+  onChange?: (v: string, caret: number) => void // caret: 글자 커서 위치 (@검색어를 찾으려고)
+  onMentionMove?: (d: 1 | -1) => void // @후보 위아래 고르기
+  onMentionPick?: (i: number) => void // @후보 넣기 (Enter · Tab · 클릭)
   onSend?: () => void
   onCancelEdit?: () => void
   onPlus?: () => void // + 메뉴 열기·닫기
@@ -40,7 +42,8 @@ const PLUS_ITEMS: [string, string, string, 'lime' | 'pink' | 'sky' | 'grape', Ic
 ]
 
 // 입력창은 [+] · 입력칸 · 보내기 세 개뿐. 나머지는 전부 + 안에 (디자인 원칙)
-export function Composer({ draft = '', popup = null, mentionCandidates = [], mentionIndex = 0, stickers = [], liarLive, value, editing, onChange, onSend, onCancelEdit, onPlus, onPopup, onSticker, onPhoto }: Props) {
+export function Composer({ draft = '', popup = null, mentionCandidates = [], mentionIndex = 0, stickers = [], liarLive, value, editing, onChange, onMentionMove, onMentionPick, onSend, onCancelEdit, onPlus, onPopup, onSticker, onPhoto }: Props) {
+  const mentioning = popup === 'mention' && mentionCandidates.length > 0
   const live = onChange !== undefined
   const text = live ? value ?? '' : draft
   const photoInput = useRef<HTMLInputElement>(null)
@@ -67,10 +70,12 @@ export function Composer({ draft = '', popup = null, mentionCandidates = [], men
               role="option"
               aria-selected={i === mentionIndex}
               className={`pitem${i === mentionIndex ? ' on' : ''}`}
+              onMouseDown={(e) => e.preventDefault()} // 입력칸 포커스를 뺏지 않게
+              onClick={onMentionPick && (() => onMentionPick(i))}
             >
-              <Avatar name={m.nick} color={m.color} size={26} />
+              <Avatar name={m.nick} color={m.color} size={26} src={m.src} />
               <span className="pitem-name">{m.nick}</span>
-              <span className="pitem-sub">{m.dnd ? '방해 금지라 알림만' : m.online ? '접속 중' : ''}</span>
+              <span className="pitem-sub">{m.via ?? (m.dnd ? '방해 금지라 알림만' : m.online ? '접속 중' : '')}</span>
             </button>
           ))}
         </div>
@@ -171,8 +176,29 @@ export function Composer({ draft = '', popup = null, mentionCandidates = [], men
               value={text}
               maxLength={2000}
               autoFocus
-              onChange={(e) => onChange(e.target.value)}
+              onChange={(e) => onChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+              onSelect={(e) => {
+                const t = e.currentTarget
+                onChange(t.value, t.selectionStart ?? t.value.length) // 커서만 옮겨도 @후보를 다시 본다
+              }}
               onKeyDown={(e) => {
+                if (mentioning && !e.nativeEvent.isComposing) {
+                  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    e.preventDefault()
+                    onMentionMove?.(e.key === 'ArrowDown' ? 1 : -1)
+                    return
+                  }
+                  if (e.key === 'Enter' || e.key === 'Tab') {
+                    e.preventDefault()
+                    onMentionPick?.(mentionIndex)
+                    return
+                  }
+                  if (e.key === 'Escape') {
+                    e.preventDefault()
+                    onPopup?.(null)
+                    return
+                  }
+                }
                 if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault()
                   onSend?.()

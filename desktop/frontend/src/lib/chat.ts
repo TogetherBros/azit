@@ -13,6 +13,7 @@ export type Outgoing = {
   at: number
   failed?: boolean
   shakeAll?: boolean
+  shakeIds?: number[] // @로 부른 사람
   kind?: 'text' | 'photo' | 'meme'
   src?: string // 보내는 동안 보여 줄 그림 (사진은 로컬 미리보기, 짤은 짤 링크)
   name?: string // 짤 이름
@@ -23,16 +24,29 @@ export type Outgoing = {
 
 type Content = { kind: 'text'; parts: MessagePart[] } | { kind: 'image'; src: string } | { kind: 'sticker'; src: string; name: string }
 
-function content(kind: string, body: string, shakeAll: boolean, src: string, name: string): Content {
+// 본문 속 @이름 하나. 서버는 본문을 파싱하지 않아서, 부른 사람(shake_ids)의 지금 닉네임으로 본문에서 찾아 칩으로 바꾼다
+type Mention = { text: string; mine: boolean }
+
+function content(kind: string, body: string, src: string, name: string, mentions: Mention[]): Content {
   if (kind === 'photo') return { kind: 'image', src }
   if (kind === 'meme') return { kind: 'sticker', src, name }
-  return { kind: 'text', parts: toParts(body, shakeAll) }
+  return { kind: 'text', parts: toParts(body, mentions) }
 }
 
 export type Me = { id: number; nick: string; color: string; src?: string }
 
-export function toRows(messages: MessageRes[], outgoing: Outgoing[], me: Me, lastReadId: number): ChatRow[] {
+// nicks: 아지트 멤버 account id → 아지트 닉네임 (@이름 칩을 찾을 때 쓴다)
+export function toRows(messages: MessageRes[], outgoing: Outgoing[], me: Me, lastReadId: number, nicks: Map<number, string> = new Map()): ChatRow[] {
   const items: { at: Date; msg: UserMessage; senderId: number; id: number }[] = []
+
+  const mentionsOf = (shakeAll: boolean, shakeIds: number[]): Mention[] => {
+    const out: Mention[] = shakeAll ? [{ text: '전체', mine: true }] : []
+    for (const id of shakeIds) {
+      const nick = nicks.get(id)
+      if (nick) out.push({ text: nick, mine: id === me.id })
+    }
+    return out
+  }
 
   for (const m of messages) {
     if (m.kind === 'system' || !m.sender) continue
@@ -42,7 +56,7 @@ export function toRows(messages: MessageRes[], outgoing: Outgoing[], me: Me, las
       senderId: m.sender.account_id,
       id: m.message_id,
       msg: {
-        ...content(m.kind, m.body, m.shake_all, m.media_url, '짤'),
+        ...content(m.kind, m.body, m.media_url, '짤', mentionsOf(m.shake_all, m.shake_ids)),
         id: String(m.message_id),
         author: { id: String(m.sender.account_id), nick: m.sender.nickname, color: m.sender.color, src: m.sender.avatar_url || undefined },
         time: '',
@@ -64,7 +78,7 @@ export function toRows(messages: MessageRes[], outgoing: Outgoing[], me: Me, las
       senderId: me.id,
       id: Number.MAX_SAFE_INTEGER,
       msg: {
-        ...content(o.kind ?? 'text', o.body, !!o.shakeAll, o.src ?? '', o.name ?? '짤'),
+        ...content(o.kind ?? 'text', o.body, o.src ?? '', o.name ?? '짤', mentionsOf(!!o.shakeAll, o.shakeIds ?? [])),
         id: o.tempId,
         author: { id: String(me.id), nick: me.nick, color: me.color, src: me.src },
         time: '',
@@ -104,10 +118,22 @@ function toReaction(r: ReactionRes): Reaction {
     : { label: r.text, count: r.count, on: r.mine, text: r.text }
 }
 
-// @전체 는 흔들기 칩으로 보여 준다
-function toParts(body: string, shakeAll: boolean): MessagePart[] {
-  if (!shakeAll || !body.includes('@전체')) return [{ text: body }]
-  return body.split(/(@전체)/).filter(Boolean).map((t) => (t === '@전체' ? { mention: '전체', shook: true } : { text: t }))
+// 본문의 @이름(부른 사람만)·@전체 를 흔들기 칩으로 바꾼다. 긴 이름부터 맞춰서 "@강백" 이 "@강백호" 를 먼저 먹지 않게.
+function toParts(body: string, mentions: Mention[]): MessagePart[] {
+  const found = mentions.filter((m) => body.includes(`@${m.text}`)).sort((a, b) => b.text.length - a.text.length)
+  if (found.length === 0) return [{ text: body }]
+  const byText = new Map(found.map((m) => [`@${m.text}`, m]))
+  const re = new RegExp(`(${found.map((m) => `@${m.text}`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`)
+  return body.split(re).filter(Boolean).map((t) => {
+    const m = byText.get(t)
+    return m ? { mention: m.text, mine: m.mine, shook: true } : { text: t }
+  })
+}
+
+// 입력 중인 @검색어. 글자 커서 바로 앞이 "@검색어" 면 그 검색어, 아니면 null
+export function mentionQuery(text: string, caret: number): string | null {
+  const m = /(?:^|\s)@([^\s@]{0,16})$/.exec(text.slice(0, caret))
+  return m ? m[1] : null
 }
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString()
