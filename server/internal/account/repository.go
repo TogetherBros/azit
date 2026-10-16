@@ -107,3 +107,19 @@ func (r *Repository) SaveAvatarKey(ctx context.Context, id int64, key string) er
 func (r *Repository) SaveBannerKey(ctx context.Context, id int64, key string) error {
 	return r.db.WithContext(ctx).Model(&Account{ID: id}).Update("banner_key", key).Error
 }
+
+// FindByIDs 는 계정 여러 개를 id → 계정 으로 돌려준다. 없는 id 는 map 에 안 들어간다.
+func (r *Repository) FindByIDs(ctx context.Context, ids []int64) (map[int64]Account, error) {
+	out := map[int64]Account{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	var accounts []Account
+	if err := r.db.WithContext(ctx).Where("id IN ?", ids).Find(&accounts).Error; err != nil {
+		return nil, err
+	}
+	for _, a := range accounts {
+		out[a.ID] = a
+	}
+	return out, nil
+}

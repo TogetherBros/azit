@@ -58,3 +58,33 @@ func (r *Repository) FindActive(ctx context.Context, azitID, accountID int64) (M
 	}
 	return m, err
 }
+
+// CountActiveAmong 은 accountIDs 중 지금 이 아지트에 들어와 있는 사람이 몇 명인지 센다.
+// "부른 사람이 전부 멤버인가" 를 한 번의 쿼리로 확인할 때 쓴다 (센 수 == len(accountIDs) 면 전부 멤버).
+func (r *Repository) CountActiveAmong(ctx context.Context, azitID int64, accountIDs []int64) (int64, error) {
+	var n int64
+	err := r.db.WithContext(ctx).Model(&Member{}).
+		Where("azit_id = ? AND account_id IN ? AND left_at IS NULL", azitID, accountIDs).
+		Count(&n).Error
+	return n, err
+}
+
+// FindByAccountIDs 는 이 아지트의 멤버 여러 명을 account id → 멤버 로 돌려준다.
+// 나간 사람도 포함한다 (나간 사람이 예전에 보낸 메시지에도 닉네임은 보여야 해서).
+func (r *Repository) FindByAccountIDs(ctx context.Context, azitID int64, accountIDs []int64) (map[int64]Member, error) {
+	out := map[int64]Member{}
+	if len(accountIDs) == 0 {
+		return out, nil
+	}
+	var members []Member
+	err := r.db.WithContext(ctx).
+		Where("azit_id = ? AND account_id IN ?", azitID, accountIDs).
+		Find(&members).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range members {
+		out[m.AccountID] = m
+	}
+	return out, nil
+}

@@ -31,6 +31,8 @@ func newApp(cfg config.Config, h *handlers, tokenProvider *auth.TokenProvider) *
 	h.azit.Routes(azits)
 	h.invite.AzitRoutes(azits)
 	h.room.Routes(azits, h.requireMember)
+	h.message.Routes(azits, h.requireMember)
+	h.meme.Routes(azits, h.requireMember)
 	h.invite.Routes(api.Group("/invites", requireAuth))
 
 	if cfg.Dev {

@@ -1,6 +1,7 @@
 package room
 
 import (
+	"context"
 	"errors"
 
 	"github.com/TogetherBros/azit/proto"
@@ -9,12 +10,23 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-type Handler struct {
-	roomRepo *Repository
+// UnreadCounter 는 방마다 안 읽은 메시지 수를 세는 쪽. message.Repository 가 이걸 만족한다.
+//
+// room 이 message 를 직접 import 하지 않고 인터페이스로 받는 이유: message 가 이미 room 을 import 한다
+// (메시지 보낼 때 방 확인). 서로 import 하면 Go 는 컴파일을 안 해 준다 (순환 import).
+// 그래서 room 은 "이런 메서드가 있는 무언가" 만 알고, 실제 값은 wire.go 에서 넣어 준다.
+// 스프링으로 치면 인터페이스에 의존하고 구현체는 DI 로 받는 것.
+type UnreadCounter interface {
+	CountUnread(ctx context.Context, azitID, accountID int64) (map[int64]int64, error)
 }
 
-func NewHandler(roomRepo *Repository) *Handler {
-	return &Handler{roomRepo: roomRepo}
+type Handler struct {
+	roomRepo *Repository
+	unread   UnreadCounter
+}
+
+func NewHandler(roomRepo *Repository, unread UnreadCounter) *Handler {
+	return &Handler{roomRepo: roomRepo, unread: unread}
 }
 
 // Routes 는 /v1/azits 그룹 아래에 방 경로를 단다.
@@ -28,13 +40,8 @@ func (h *Handler) Routes(r fiber.Router, requireMember fiber.Handler) {
 
 // List 는 아지트의 방 목록. 멤버면 누구나. GET /v1/azits/{id}/rooms
 func (h *Handler) List(c fiber.Ctx) error {
-	azitID := fiber.Params[int64](c, "id")
-
-	rooms, err := h.roomRepo.ListByAzit(c.Context(), azitID)
-	if err != nil {
-		return err
-	}
-	return c.JSON(toResponses(rooms))
+	me := member.Current(c)
+	return h.writeList(c, me)
 }
 
 // Create 는 방을 맨 아래에 만든다. 관리자 이상만. POST /v1/azits/{id}/rooms
@@ -126,11 +133,25 @@ func (h *Handler) Reorder(c fiber.Ctx) error {
 		return err
 	}
 
+	return h.writeList(c, me)
+}
+
+// writeList 는 아지트 방 목록에 내 안 읽은 수를 붙여 응답한다. 목록과 순서 바꾸기가 같이 쓴다.
+func (h *Handler) writeList(c fiber.Ctx, me member.Member) error {
 	rooms, err := h.roomRepo.ListByAzit(c.Context(), me.AzitID)
 	if err != nil {
 		return err
 	}
-	return c.JSON(toResponses(rooms))
+	unread, err := h.unread.CountUnread(c.Context(), me.AzitID, me.AccountID)
+	if err != nil {
+		return err
+	}
+
+	res := toResponses(rooms)
+	for i := range res {
+		res[i].Unread = unread[res[i].RoomID] // 없는 방은 0
+	}
+	return c.JSON(res)
 }
 
 // requireAdmin 은 관리자 이상이 아니면 403 을 돌려준다.

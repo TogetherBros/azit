@@ -17,6 +17,7 @@ type RoomResponse struct {
 	AzitID   int64  `json:"azit_id"`
 	Name     string `json:"name"`
 	Position int    `json:"position"` // 작을수록 위
+	Unread   int64  `json:"unread"`   // 내가 안 읽은 메시지 수 (내가 보낸 것, 지운 것은 빼고)
 }
 
 // ReorderRoomsRequest 는 PUT /v1/azits/{id}/rooms/order 의 요청이다.
