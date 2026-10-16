@@ -227,7 +227,6 @@ const SCREENS: Record<string, () => ReactNode> = {
   'set-reacts': settings('reacts', <ReactsTab reacts={M.REACT_LIST} draft="실화냐" />),
   'set-reacts-dup': settings('reacts', <ReactsTab reacts={M.REACT_LIST} draft="ㅋㅋ" error="ㅋㅋ는 이미 목록에 있어요" />),
   'set-reacts-full': settings('reacts', <ReactsTab reacts={M.REACT_LIST_FULL} draft="ㄹㅇ" error="10개 꽉 찼어요. 하나 빼고 넣어 주세요" />),
-  'set-reacts-meme': settings('reacts', <ReactsTab reacts={M.REACT_LIST} draft="" stickers={M.STICKERS} />),
   'set-reacts-member': settings('reacts', <ReactsTab reacts={M.REACT_LIST} draft="" readOnly />),
   'set-stickers': settings('stickers', <StickersTab stickers={M.STICKERS} />),
   'set-log': settings('log', <LogTab entries={M.LOGS} />),

@@ -298,7 +298,6 @@ function Reacts({ azitId, reacts, memes, readOnly, onChanged }: {
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
-  const [picking, setPicking] = useState(false)
 
   const items: ReactItem[] = reacts.map((r) => ({ text: r.text, meme_id: r.meme_id }))
 
@@ -321,10 +320,6 @@ function Reacts({ azitId, reacts, memes, readOnly, onChanged }: {
     ? { id: `r${r.react_id}`, img: r.meme_url, name: memes.find((m) => m.meme_id === r.meme_id)?.name ?? '짤', memeId: r.meme_id }
     : { id: `r${r.react_id}`, text: r.text })
 
-  const stickers: Sticker[] = memes.map((m) => ({
-    id: String(m.meme_id), name: m.name, src: m.url, by: '', ago: ago(m.created_at), inReacts: reacts.some((r) => r.meme_id === m.meme_id),
-  }))
-
   return (
     <ReactsTab
       reacts={options}
@@ -332,7 +327,6 @@ function Reacts({ azitId, reacts, memes, readOnly, onChanged }: {
       error={error}
       readOnly={readOnly}
       busy={busy}
-      stickers={picking ? stickers : undefined}
       onAdd={(text) => save([...items, { text, meme_id: 0 }])}
       onMove={(i, dir) => {
         const next = [...items]
@@ -342,8 +336,6 @@ function Reacts({ azitId, reacts, memes, readOnly, onChanged }: {
         void save(next)
       }}
       onRemove={(i) => void save(items.filter((_, k) => k !== i))}
-      onToggleMemes={() => setPicking((p) => !p)}
-      onPickMeme={(id) => void save([...items, { text: '', meme_id: Number(id) }])}
     />
   )
 }
