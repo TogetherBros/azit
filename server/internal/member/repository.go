@@ -3,6 +3,7 @@ package member
 import (
 	"context"
 	"errors"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -87,4 +88,36 @@ func (r *Repository) FindByAccountIDs(ctx context.Context, azitID int64, account
 		out[m.AccountID] = m
 	}
 	return out, nil
+}
+
+// ListActive 는 지금 들어와 있는 멤버 전부. 들어온 순서대로.
+func (r *Repository) ListActive(ctx context.Context, azitID int64) ([]Member, error) {
+	var members []Member
+	err := r.db.WithContext(ctx).
+		Where("azit_id = ? AND left_at IS NULL", azitID).
+		Order("joined_at, account_id").
+		Find(&members).Error
+	return members, err
+}
+
+// UpdateNickName 은 이 아지트 안 닉네임을 바꾼다.
+func (r *Repository) UpdateNickName(ctx context.Context, azitID, accountID int64, nickname string) error {
+	return r.db.WithContext(ctx).Model(&Member{}).
+		Where("azit_id = ? AND account_id = ? AND left_at IS NULL", azitID, accountID).
+		Update("nick_name", nickname).Error
+}
+
+// UpdateRole 은 역할을 바꾼다.
+func (r *Repository) UpdateRole(ctx context.Context, azitID, accountID int64, role Role) error {
+	return r.db.WithContext(ctx).Model(&Member{}).
+		Where("azit_id = ? AND account_id = ? AND left_at IS NULL", azitID, accountID).
+		Update("role", role).Error
+}
+
+// Leave 는 멤버를 나간 상태로 만든다 (스스로 나가기, 내보내기 둘 다). 줄은 지우지 않는다:
+// 예전 메시지에 닉네임이 보여야 하고, 초대 코드로 다시 들어오면 이 줄을 살린다.
+func (r *Repository) Leave(ctx context.Context, azitID, accountID int64, at time.Time) error {
+	return r.db.WithContext(ctx).Model(&Member{}).
+		Where("azit_id = ? AND account_id = ? AND left_at IS NULL", azitID, accountID).
+		Update("left_at", at).Error
 }

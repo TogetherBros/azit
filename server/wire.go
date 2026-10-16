@@ -28,6 +28,7 @@ type handlers struct {
 	room    *room.Handler
 	message *message.Handler
 	meme    *meme.Handler
+	member  *member.Handler
 
 	// requireMember 는 /v1/azits/{id}/... 경로에 끼우는 아지트 멤버 확인 미들웨어.
 	requireMember fiber.Handler
@@ -60,6 +61,7 @@ func newHandlers(cfg config.Config, conn *gorm.DB, tokenProvider *auth.TokenProv
 		room:    room.NewHandler(roomRepo, messageRepo), // messageRepo 가 room.UnreadCounter 를 만족한다
 		message: message.NewHandler(messageRepo, roomRepo, memberRepo, accountRepo, memeRepo, r2),
 		meme:    meme.NewHandler(memeRepo, r2),
+		member:  member.NewHandler(memberRepo, accountRepo, r2),
 
 		requireMember: member.RequireMember(memberRepo),
 	}, nil
