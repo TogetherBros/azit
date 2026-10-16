@@ -204,8 +204,8 @@ const STATUS = [['todo', '구현 전', 'gray'], ['doing', '진행 중', 'blue'],
 
 // 자주 나오는 응답 조각
 const MEMBER = { account_id: 2, nick: '강백호', color: '#7BC4FF', title: '포커페이스', online: true, dnd: false, via_code: 'MK7Q2X', joined_at: '2026-09-20T11:02:00Z' };
-const ROOM = { id: 3, azit_id: 1, name: '게임방', landing: false, archived: false, last_seq: 128, read_seq: 124, unread: 4, last_message: { seq: 128, kind: 'text', author_id: 2, preview: '라이어 할 사람', created_at: '2026-10-07T05:20:00Z' }, live_game: { id: 9, status: 'lobby' } };
-const MSG = { id: 812, room_id: 3, seq: 128, client_id: '0f8c1a2e-5b8d-4c1e-9a77-3b2f0d1c9e44', kind: 'text', author_id: 1, body: '@강백호 점심 내기 누가 쏨', mentions: [{ account_id: 2, shook: true }], reactions: [], deleted: false, created_at: '2026-10-07T05:10:00Z' };
+const ROOM = { room_id: 3, azit_id: 1, name: '게임방', position: 1, unread: 4 };
+const MSG = { message_id: 812, room_id: 3, temp_id: '0f8c1a2e-5b8d-4c1e-9a77-3b2f0d1c9e44', kind: 'text', body: '@강백호 점심 내기 누가 쏨', reply_to_id: null, shake_ids: [2], shake_all: false, created_at: '2026-10-16T05:10:00Z', edited_at: null, deleted: false, sender: { account_id: 1, nickname: '4n5rud', color: '#D4FF3A', avatar_url: 'https://…' }, reactions: [{ text: 'ㅋㅋ', meme_id: 0, meme_url: '', count: 2, mine: true }] };
 
 /* 엔드포인트 하나 = 노션 데이터베이스 행 하나
  * f: { id, name, method, path, domain, mvp, auth, screens, desc, params, query, body, res, status, errors, notes, go } */
@@ -336,102 +336,106 @@ const E = [
 { id: 'bans-delete', name: '막은 것 풀기', method: 'DELETE', path: '/v1/azits/{azit_id}/bans/{account_id}', domain: '멤버', mvp: 'MVP 2', auth: '세션',
   screens: 'set-members', desc: '풀어도 자동으로 다시 들어오진 않아요. 새 코드가 필요해요.', status: '204' },
 
-/* ---------------- 방 ---------------- */
-{ id: 'rooms-list', name: '방 목록', method: 'GET', path: '/v1/azits/{azit_id}/rooms', domain: '방', mvp: 'MVP 1', auth: '세션',
-  screens: '방 목록, mini-rooms, set-rooms', desc: '최근 메시지 순. <code>last_seq</code>와 <code>read_seq</code>의 차이가 안 읽은 수, 그리고 재접속 때 빠진 메시지 판단 기준.',
-  query: [['archived', 'bool', 'true 면 보관함 방만 (설정 화면용)']],
-  res: { rooms: [ROOM] }, status: '200',
-  notes: ['미리보기 글자는 서버가 안 만들어요. <code>last_message</code> 구조로 주면 앱이 "강백호: 라이어 할 사람"으로 그려요 (닉네임이 바뀌어도 맞게).'] },
+/* ---------------- 방 ----------------
+ * 여기서부터 사진·짤까지는 실제 서버 코드 기준 (2026-10-16). 경로는 전부 /v1/azits/{azit_id} 아래이고,
+ * 아지트 멤버가 아니면 404 (아지트가 있는지조차 숨김). member.RequireMember 미들웨어가 막아요. */
+{ id: 'rooms-list', st: 'done', name: '방 목록', method: 'GET', path: '/v1/azits/{azit_id}/rooms', domain: '방', mvp: 'MVP 1', auth: '세션',
+  screens: '방 목록, mini-rooms, set-rooms', desc: '<code>position</code> 순서 (작을수록 위). <code>unread</code>는 내가 안 읽은 메시지 수 — 내가 보낸 것, 지운 것은 빼요.',
+  res: [ROOM], status: '200',
+  notes: ['기본 방 <code>아지트</code>는 아지트를 만들 때 자동으로 생겨요.', '안 읽은 수는 <code>room_reads.last_read_message_id</code>보다 큰 메시지를 세요.'],
+  go: ['room 이 message 를 import 하면 순환 import (message 가 이미 room 을 씀). 그래서 room 에 <code>UnreadCounter</code> 인터페이스를 두고 wire.go 에서 <code>message.Repository</code>를 꽂아요 — 스프링의 인터페이스 의존 + DI.'] },
 
-{ id: 'rooms-create', name: '방 만들기', method: 'POST', path: '/v1/azits/{azit_id}/rooms', domain: '방', mvp: 'MVP 1', auth: '세션',
-  screens: 'modal-newroom, modal-newroom-error', desc: '아지트 멤버는 모든 방에 자동으로 있어요. 지울 수 없고 보관만.',
-  body: { name: '시험 끝나고' }, res: Object.assign({}, ROOM, { id: 8, name: '시험 끝나고', last_seq: 1, read_seq: 1, unread: 0, live_game: null }), status: '201',
-  errors: [['validation_failed', 400, '방 이름을 넣어 주세요 / 방 이름은 20자까지예요'], ['room_name_taken', 409, '같은 이름의 방이 이미 있어요'], ['room_limit', 409, '방은 20개까지예요. 안 쓰는 방을 보관해 주세요']],
-  notes: ['"방 만듦" sys 메시지가 seq 1 이에요.'] },
+{ id: 'rooms-create', st: 'done', name: '방 만들기', method: 'POST', path: '/v1/azits/{azit_id}/rooms', domain: '방', mvp: 'MVP 1', auth: '세션 · admin 이상',
+  screens: 'modal-newroom, modal-newroom-error', desc: '맨 아래에 생겨요. 아지트 멤버는 모든 방에 자동으로 있어요.',
+  body: { name: '시험 끝나고' }, res: Object.assign({}, ROOM, { room_id: 8, name: '시험 끝나고', position: 3, unread: 0 }), status: '201',
+  errors: [['bad_request', 400, '방 이름을 넣어 주세요 / 방 이름은 20자까지예요'], ['forbidden', 403, '관리자만 할 수 있어요']] },
 
-{ id: 'room-patch', name: '방 이름 바꾸기 · 보관 · 꺼내기', method: 'PATCH', path: '/v1/rooms/{room_id}', domain: '방', mvp: 'MVP 2', auth: '세션',
-  screens: 'set-rooms, set-rooms-landing', desc: '보관하면 목록에서 숨고 메시지는 그대로. 누구나 꺼낼 수 있어요.',
-  body: { name: '건축 자랑방', archived: false }, res: '방 목록의 한 항목', status: '200',
-  errors: [['room_name_taken', 409, '같은 이름의 방이 있어요 (꺼낼 때도)'], ['landing_cannot_archive', 409, '새 멤버가 처음 들어오는 방이라 보관할 수 없어요'], ['game_in_progress', 409, '진행 중인 판이 끝나야 보관할 수 있어요']] },
+{ id: 'room-patch', st: 'done', name: '방 이름 바꾸기', method: 'PATCH', path: '/v1/azits/{azit_id}/rooms/{room_id}', domain: '방', mvp: 'MVP 1', auth: '세션 · admin 이상',
+  screens: 'set-rooms', desc: '', body: { name: '건축 자랑방' }, res: '방 목록의 한 항목', status: '200',
+  errors: [['bad_request', 400, '방 이름을 넣어 주세요 / 방 이름은 20자까지예요'], ['forbidden', 403, '관리자만 할 수 있어요'], ['not_found', 404, '(다른 아지트 방이어도 404)']] },
 
-{ id: 'room-read', name: '여기까지 읽음', method: 'POST', path: '/v1/rooms/{room_id}/read', domain: '방', mvp: 'MVP 1', auth: '세션',
-  screens: '채팅 화면 열기·스크롤', desc: '읽은 위치는 앞으로만 가요 (더 작은 seq 가 오면 무시). 내 다른 기기에도 <code>room.read</code> 이벤트.',
-  body: { seq: 128 }, status: '204',
-  go: ['<code>UPDATE room_reads SET seq = MAX(seq, ?)</code> — SQLite 의 스칼라 MAX 로 한 줄에.', 'MVP 1 테이블 목록엔 없지만 안 읽은 수를 위해 <code>room_reads(room_id, account_id, seq)</code>가 필요해요.'] },
+{ id: 'rooms-order', st: 'done', name: '방 순서 바꾸기', method: 'PUT', path: '/v1/azits/{azit_id}/rooms/order', domain: '방', mvp: 'MVP 1', auth: '세션 · admin 이상',
+  screens: 'set-rooms (끌어서 옮기기)', desc: '그 아지트 방 전부를 새 순서대로 보내요. 응답은 바뀐 방 목록 전체.',
+  body: { room_ids: [3, 1, 2] }, res: '방 목록과 같음', status: '200',
+  errors: [['bad_request', 400, '(빠진 방이나 남의 방이 섞임)'], ['forbidden', 403, '관리자만 할 수 있어요']] },
+
+{ id: 'room-read', st: 'done', name: '여기까지 읽음', method: 'POST', path: '/v1/azits/{azit_id}/rooms/{room_id}/read', domain: '방', mvp: 'MVP 1', auth: '세션',
+  screens: '채팅 화면 열기·스크롤', desc: '화면에 보인 가장 아래 메시지 id 로 불러요. 읽은 위치는 앞으로만 가요 (더 작은 id 가 오면 무시).',
+  body: { message_id: 128 }, status: '204',
+  errors: [['bad_request', 400, '이 방 메시지가 아니에요'], ['not_found', 404, '방이 없어요']],
+  notes: ['메시지를 보내면 보낸 사람은 거기까지 읽은 걸로 쳐요 ("여기까지 읽었음" 선이 내 메시지 위에 안 생기게).'],
+  go: ['upsert: <code>INSERT … ON CONFLICT (account_id, room_id) DO UPDATE SET last_read_message_id = MAX(room_reads.last_read_message_id, excluded.last_read_message_id)</code> — GORM <code>clause.OnConflict</code>.'] },
 
 /* ---------------- 메시지 ---------------- */
-{ id: 'messages-list', name: '메시지 가져오기', method: 'GET', path: '/v1/rooms/{room_id}/messages', domain: '메시지', mvp: 'MVP 1', auth: '세션',
-  screens: 'chat (처음 열기, 위로 스크롤, 재접속)', desc: '두 방향. <code>after_seq</code> = 재접속 때 빠진 것 채우기, <code>before_seq</code> = 위로 스크롤해서 옛날 것.',
-  query: [['after_seq', 'int', '이 seq 보다 큰 것을 오래된 순으로'], ['before_seq', 'int', '이 seq 보다 작은 것을 최근 순으로 (둘 다 없으면 최신 limit 개)'], ['limit', 'int', '기본 50, 최대 200']],
-  res: { messages: [MSG], has_more: false }, status: '200',
-  notes: ['응답 배열은 <b>항상 seq 오름차순</b>으로 정렬해서 줘요 (before 로 가져와도).', '<code>has_more</code>가 true 면 같은 방향으로 한 번 더.'] },
+{ id: 'messages-list', st: 'done', name: '메시지 가져오기', method: 'GET', path: '/v1/azits/{azit_id}/rooms/{room_id}/messages', domain: '메시지', mvp: 'MVP 1', auth: '세션',
+  screens: 'chat (처음 열기, 위로 스크롤)', desc: '처음엔 <code>before</code> 없이 → 최신 limit 개. 위로 스크롤하면 지금 맨 위 메시지 id 를 <code>before</code>로.',
+  query: [['before', 'int', '이 id 보다 작은 것만. 없으면 맨 최신부터'], ['limit', 'int', '기본 50, 최대 100']],
+  res: { messages: [MSG], has_more: false, last_read_id: 124 }, status: '200',
+  notes: ['응답 배열은 <b>항상 오래된 → 최신</b> 순서.', '<code>has_more</code>: limit 보다 1개 더 읽어 보고 판단 (COUNT 쿼리 없음).', '<code>last_read_id</code>: "여기까지 읽었음" 선 위치. 기록 없으면 0.', '지운 메시지도 와요 (<code>deleted: true</code>, 본문·@·맞장구는 비움).'],
+  go: ['보낸 사람·@·맞장구를 메시지마다 조회하면 N+1. id 를 모아서 종류별로 <code>IN (…)</code> 한 번씩 → map 으로 붙여요 (<code>message/response.go</code> toResponses).'] },
 
-{ id: 'messages-send', name: '메시지 보내기', method: 'POST', path: '/v1/rooms/{room_id}/messages', domain: '메시지', mvp: 'MVP 1', auth: '세션',
-  screens: 'chat 입력창, chat-mention, chat-reconnect', desc: '<code>client_id</code>는 앱이 만든 UUID. 같은 client_id 로 다시 보내면 새로 만들지 않고 처음 것을 돌려줘요 → 끊겨서 재전송해도 중복 0. <code>mentions</code>에 들어간 사람은 흔들려요.',
-  body: { client_id: '0f8c1a2e-5b8d-4c1e-9a77-3b2f0d1c9e44', kind: 'text', body: '@강백호 점심 내기 누가 쏨', mentions: [2] },
-  res: MSG, status: '201 (재전송이면 200)',
-  extra: [['MVP 2 · 사진', { client_id: '…', kind: 'image', media_key: 'm_7Yp2...' }], ['MVP 2 · 짤', { client_id: '…', kind: 'sticker', sticker_id: 5 }]],
-  errors: [['validation_failed', 400, '빈 메시지 / 4000자 초과'], ['shake_rate_limited', 429, '흔들기는 1분에 3번까지예요 · {n}초 뒤에'], ['room_archived', 409, '보관된 방이에요. 꺼내야 보낼 수 있어요']],
-  notes: ['흔들기 제한에 걸리면 <b>메시지 전체를 거절</b>해요. 앱은 입력한 글을 지우지 않아요 (에러 문구 원칙).', '멘션 대상이 방해 금지면 창은 안 흔들리고 알림만.'],
-  go: ['seq 는 트랜잭션 안에서: <code>UPDATE rooms SET last_seq = last_seq + 1 WHERE id = ? RETURNING last_seq</code> → 그 값으로 INSERT. 방마다 1, 2, 3 … 빈칸 없이.', '<code>UNIQUE(room_id, seq)</code>, <code>UNIQUE(author_id, client_id)</code>. 두 번째 UNIQUE 위반이 나면 기존 메시지를 SELECT 해서 200.', '커밋이 끝난 <b>다음에</b> hub 에 넘겨 배달 (커밋 전에 보내면 롤백됐는데 화면엔 뜨는 사고).'] },
+{ id: 'messages-send', st: 'done', name: '메시지 보내기', method: 'POST', path: '/v1/azits/{azit_id}/rooms/{room_id}/messages', domain: '메시지', mvp: 'MVP 1', auth: '세션',
+  screens: 'chat 입력창, chat-mention', desc: '<code>temp_id</code>(번호표)는 앱이 메시지마다 한 번 만든 UUID. 같은 번호표로 다시 오면 새로 만들지 않고 처음 것을 돌려줘요 → 끊겨서 재전송해도 중복 0. <code>shake_ids</code>에 넣은 사람은 흔들려요.',
+  body: { temp_id: '0f8c1a2e-5b8d-4c1e-9a77-3b2f0d1c9e44', body: '@강백호 점심 내기 누가 쏨', reply_to_id: null, shake_ids: [2], shake_all: false },
+  res: MSG, status: '201 (재전송도 201)',
+  errors: [['bad_request', 400, '메시지를 입력해 주세요 / 2000자까지 / temp_id 가 없어요 / 이 아지트에 없는 사람을 불렀어요 / 답장할 메시지가 이 방에 없어요'], ['temp_id_conflict', 409, '(같은 번호표인데 본문이 다름)'], ['not_found', 404, '방이 없어요']],
+  notes: ['@ 는 서버가 본문을 파싱하지 않아요. 앱이 @칩으로 고른 사람 id 를 <code>shake_ids</code>로 보내요 (닉네임은 바뀌고 겹칠 수 있어서).', '@로 부르면 = 흔들기. 방해 금지·횟수 제한 없음.', '<code>shake_all</code> = @전체. 온라인인 전원을 흔들어요 (사람별 줄은 안 만듦).', '같은 사람을 두 번 넣어도 한 번으로 쳐요.', '사진·짤 메시지(<code>kind</code> photo, meme)는 나중에.'],
+  go: ['메시지 + shakes 줄을 <code>db.Transaction</code> 하나로. 하나라도 실패하면 둘 다 롤백.', '<code>UNIQUE(sender_id, temp_id)</code>.', '커밋이 끝난 <b>다음에</b> 웹소켓으로 배달 (커밋 전에 보내면 롤백됐는데 화면엔 뜨는 사고).'] },
 
-{ id: 'messages-delete', name: '내 메시지 지우기', method: 'DELETE', path: '/v1/rooms/{room_id}/messages/{message_id}', domain: '메시지', mvp: 'MVP 2', auth: '세션',
-  screens: 'modal-delete', desc: '내 것만. 행은 남기고 <code>deleted=true</code>, 본문은 비워요 → 모두의 화면에서 "지운 메시지". 되돌릴 수 없어요.', status: '204',
-  errors: [['forbidden', 403, '(남의 메시지)'], ['not_found', 404, '']],
-  notes: ['seq 는 그대로라 순서가 안 깨져요. <code>message.deleted</code> 이벤트.'] },
+{ id: 'messages-patch', st: 'done', name: '내 메시지 고치기', method: 'PATCH', path: '/v1/azits/{azit_id}/messages/{message_id}', domain: '메시지', mvp: 'MVP 1', auth: '세션 · 보낸 본인',
+  screens: 'chat 메시지 메뉴', desc: '본문만 고쳐요 (@ 와 답장 대상은 그대로). 바뀐 게 없으면 <code>edited_at</code>도 안 바뀌어요.',
+  body: { body: '점심 내기 누가 쏨 (수정)' }, res: MSG, status: '200',
+  errors: [['bad_request', 400, '지운 메시지는 고칠 수 없어요 / 글자 메시지만 / 빈 메시지'], ['forbidden', 403, '내가 보낸 메시지만 고칠 수 있어요'], ['not_found', 404, '메시지가 없어요']] },
 
-{ id: 'reactions-put', name: '맞장구 달기', method: 'PUT', path: '/v1/messages/{message_id}/reactions/{react_id}', domain: '메시지', mvp: 'MVP 2', auth: '세션',
-  screens: 'chat 메시지 hover 메뉴', desc: '같은 걸 두 번 PUT 해도 한 번 (멱등). 끄기는 DELETE.', status: '204',
-  notes: ['바뀌면 <code>reaction.updated</code>로 그 메시지의 맞장구 전체 개수를 보내요 (증감 말고 최종값 → 순서 꼬여도 안전).'] },
+{ id: 'messages-delete', st: 'done', name: '메시지 지우기', method: 'DELETE', path: '/v1/azits/{azit_id}/messages/{message_id}', domain: '메시지', mvp: 'MVP 1', auth: '세션 · 보낸 본인 또는 admin 이상',
+  screens: 'modal-delete', desc: '행은 남기고 <code>deleted_at</code>만 채워요 → 모두의 화면에서 "삭제된 메시지". 이미 지운 거면 그냥 204.', status: '204',
+  errors: [['forbidden', 403, '내가 보낸 메시지만 지울 수 있어요'], ['not_found', 404, '메시지가 없어요']] },
 
-{ id: 'reactions-delete', name: '맞장구 빼기', method: 'DELETE', path: '/v1/messages/{message_id}/reactions/{react_id}', domain: '메시지', mvp: 'MVP 2', auth: '세션',
-  screens: 'chat', desc: '', status: '204' },
+{ id: 'reactions-put', st: 'done', name: '맞장구 달기', method: 'PUT', path: '/v1/azits/{azit_id}/messages/{message_id}/reactions', domain: '메시지', mvp: 'MVP 1', auth: '세션',
+  screens: 'chat 메시지 hover 메뉴', desc: '글자(1~2자, 아무거나) 또는 이 아지트 짤 하나. 같은 걸 두 번 PUT 해도 한 번 (멱등). 응답은 그 메시지의 맞장구 묶음 전체.',
+  body: { text: 'ㅋㅋ', meme_id: 0 }, res: [{ text: 'ㅋㅋ', meme_id: 0, meme_url: '', count: 2, mine: true }, { text: '', meme_id: 5, meme_url: 'https://…(R2 보기 링크)', count: 1, mine: false }], status: '200',
+  extra: [['짤 맞장구', { text: '', meme_id: 5 }]],
+  errors: [['bad_request', 400, '글자나 짤 중 하나를 골라 주세요 / 둘 다는 안 돼요 / 2자까지 / 짤이 없어요 / 지운 메시지예요'], ['react_limit', 409, '이 메시지에는 맞장구를 더 달 수 없어요 (10종류까지)']],
+  notes: ['한 사람이 여러 종류를 달 수 있어요. 같은 맞장구는 묶어서 "ㅋㅋ 2".', '한 메시지에 <b>종류</b> 최대 10개. 이미 있는 종류에는 계속 달 수 있어요.', '저장은 아지트 목록 id 가 아니라 내용(글자 / 짤 id) → 목록을 바꿔도 이미 단 맞장구는 안 깨져요.', '바뀌면 웹소켓으로 그 메시지의 최종 묶음을 보낼 예정 (증감 말고 최종값 → 순서 꼬여도 안전).'] },
+
+{ id: 'reactions-delete', st: 'done', name: '맞장구 떼기', method: 'DELETE', path: '/v1/azits/{azit_id}/messages/{message_id}/reactions', domain: '메시지', mvp: 'MVP 1', auth: '세션',
+  screens: 'chat', desc: '내가 단 것만 떼요. 본문은 달기와 같아요. 안 달려 있었어도 성공.', body: { text: 'ㅋㅋ', meme_id: 0 }, res: '달기와 같음', status: '200' },
 
 /* ---------------- 흔들기 ---------------- */
 { id: 'shake', name: '메시지 없이 흔들기', method: 'POST', path: '/v1/rooms/{room_id}/shake', domain: '흔들기', mvp: 'MVP 1', auth: '세션',
-  screens: 'modal-shake, sys 메시지의 되흔들기·환영 흔들기, modal-member', desc: '상대 창이 실제로 흔들려요. "강백호가 흔들었어요 · 4n5rud" sys 메시지가 그 방에 남아요.',
-  body: { to: 2 }, res: { delivered: 'shake', message: { id: 813, seq: 129, kind: 'sys', sys: { type: 'shake', actor_id: 1, target_id: 2 } } }, status: '201',
-  extra: [['상대가 방해 금지면', { delivered: 'notify_only', message: '…' }]],
-  errors: [['shake_rate_limited', 429, '흔들기는 1분에 3번까지예요 · {n}초 뒤에'], ['member_not_found', 404, '나간 멤버예요'], ['cannot_shake_self', 400, '']],
-  notes: ['제한은 <b>보내는 사람 기준</b> 1분 3회. @멘션 흔들기와 합산.'],
-  go: ['횟수 제한은 메모리로 충분: <code>map[accountID][]time.Time</code> + <code>sync.Mutex</code>. 로드맵 5단계의 첫 Mutex 실습.', '받는 사람에게는 <code>shake</code> 이벤트가 가고, 앱은 Go 쪽(bridge)에서 실제 창을 흔들어요.'] },
+  screens: 'modal-shake, sys 메시지의 되흔들기·환영 흔들기, modal-member', desc: '(옛 기획) 지금은 @로 부르면 = 흔들기라 메시지 보내기에 들어가 있어요. 버튼 흔들기를 따로 둘지는 미정.',
+  body: { to: 2 }, status: '201',
+  notes: ['방해 금지와 횟수 제한은 없애기로 했어요 (2026-10-16).'] },
 
 /* ---------------- 사진·짤 ---------------- */
-{ id: 'media-upload', name: '사진 올리기', method: 'POST', path: '/v1/media', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
-  screens: 'chat + 사진, set-stickers + 짤 올리기', desc: '<code>multipart/form-data</code>의 <code>file</code> 하나. 받은 <code>media_key</code>로 메시지를 보내거나 짤로 저장해요. 24시간 안에 안 쓰면 지워요.',
-  body: '(multipart) file=@photo.jpg  purpose=message|sticker',
-  res: { media_key: 'm_7Yp2Qx...', width: 1280, height: 960, bytes: 482113 }, status: '201',
-  errors: [['file_too_large', 413, '{n}MB라 못 보내요 · 10MB까지 (짤은 5MB까지예요)'], ['unsupported_media', 415, '사진 파일만 보낼 수 있어요 / 사진을 읽지 못했어요. 다른 사진으로 해 주세요']],
-  go: ['<code>http.MaxBytesReader</code>로 크기 제한을 먼저 걸고 읽기.', '종류 판별은 확장자 말고 <code>http.DetectContentType</code>(앞 512바이트).', '줄이기: 긴 변 1600px(사진) / 512px(짤).'] },
+{ id: 'uploads', st: 'done', name: '올릴 주소 받기', method: 'POST', path: '/v1/uploads', domain: '사진·짤', mvp: 'MVP 1', auth: '세션',
+  screens: 'me 사진·배너, 아지트 배너, 짤 올리기', desc: '서버가 R2 presigned PUT 주소를 줘요 (10분). 앱(Go 쪽)이 그 주소로 직접 PUT 하고, 받은 <code>key</code>를 다음 API 에 넘겨요.',
+  body: { kind: 'meme', content_type: 'image/gif', size: 482113 }, res: { key: 'memes/1/ABCD….gif', url: 'https://…(PUT 주소)' }, status: '200',
+  notes: ['kind: avatar, banner, azit_banner (5MB, png/jpg/webp), meme (10MB, gif 도 됨).'] },
 
-{ id: 'media-get', name: '사진 받기', method: 'GET', path: '/v1/media/{media_key}', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
-  screens: 'chat, modal-image', desc: '이미지 바이트. 그 사진이 올라간 아지트 멤버만. <code>Cache-Control: private, max-age=31536000, immutable</code> (키가 안 바뀌니까).', status: '200 (image/*)' },
+{ id: 'memes-list', st: 'done', name: '짤 모음', method: 'GET', path: '/v1/azits/{azit_id}/memes', domain: '사진·짤', mvp: 'MVP 1', auth: '세션',
+  screens: 'chat-sticker, set-stickers', desc: '아지트 공동 짤. 최신 순, 지운 건 빼고.',
+  res: [{ meme_id: 5, name: '킹받네', url: 'https://…(R2 보기 링크, 24시간)', created_by: 3, created_at: '2026-10-16T05:00:00Z' }], status: '200' },
 
-{ id: 'stickers-list', name: '짤 모음', method: 'GET', path: '/v1/azits/{azit_id}/stickers', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
-  screens: 'chat-sticker, set-stickers', desc: '',
-  res: { stickers: [{ id: 5, name: '킹받네', media_key: 'm_k1...', created_by_nick: '김환성', created_at: '2026-10-07T05:00:00Z', in_reacts: false }] }, status: '200' },
+{ id: 'memes-create', st: 'done', name: '짤 등록', method: 'POST', path: '/v1/azits/{azit_id}/memes', domain: '사진·짤', mvp: 'MVP 1', auth: '세션',
+  screens: 'set-stickers', desc: '<code>POST /v1/uploads</code> (kind=meme) → R2 PUT → 여기로 key. 멤버 누구나.',
+  body: { name: '킹받네', key: 'memes/1/ABCD….gif' }, res: '짤 모음의 한 항목', status: '201',
+  errors: [['bad_request', 400, '짤 이름을 입력해 주세요 / 20자까지 / 올린 짤을 찾을 수 없어요']],
+  notes: ['key 가 <b>내</b> 폴더(<code>memes/{내 id}/</code>)인지, R2 에 실제로 올라가 있는지(HEAD) 확인해요.'] },
 
-{ id: 'stickers-create', name: '짤로 저장', method: 'POST', path: '/v1/azits/{azit_id}/stickers', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
-  screens: '메시지 "짤로 저장", set-stickers', desc: '새로 올린 사진(<code>media_key</code>) 또는 채팅의 사진·짤 메시지(<code>from_message_id</code>)에서.',
-  body: { media_key: 'm_7Yp2...', name: '킹받네' }, res: { id: 6, name: '킹받네', media_key: 'm_7Yp2...' }, status: '201',
-  extra: [['채팅 사진에서', { from_message_id: 815, name: '사진' }]],
-  errors: [['sticker_limit', 409, '짤은 60개까지예요. 안 쓰는 짤을 빼 주세요'], ['sticker_duplicate', 409, '이미 있는 짤이에요']],
-  go: ['중복 판별은 이미지 바이트의 sha256 을 <code>stickers.hash</code>에 UNIQUE(azit_id, hash).'] },
+{ id: 'memes-delete', st: 'done', name: '짤 지우기', method: 'DELETE', path: '/v1/azits/{azit_id}/memes/{meme_id}', domain: '사진·짤', mvp: 'MVP 1', auth: '세션 · 올린 사람 또는 admin 이상',
+  screens: 'set-stickers', desc: '숨김(soft delete). 맞장구 목록에 있으면 거기서도 빠져요. 이미 메시지에 달린 짤 맞장구는 계속 보여요.', status: '204',
+  errors: [['forbidden', 403, '올린 사람이나 관리자만 지울 수 있어요'], ['not_found', 404, '짤이 없어요']] },
 
-{ id: 'stickers-patch', name: '짤 이름 바꾸기', method: 'PATCH', path: '/v1/azits/{azit_id}/stickers/{sticker_id}', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
-  screens: 'set-stickers', desc: '', body: { name: '현타' }, status: '200', errors: [['validation_failed', 400, '1~10자']] },
+{ id: 'reacts-get', st: 'done', name: '아지트 맞장구 목록', method: 'GET', path: '/v1/azits/{azit_id}/reacts', domain: '사진·짤', mvp: 'MVP 1', auth: '세션',
+  screens: 'chat hover 메뉴, set-stickers', desc: '메시지에 맞장구 달 때 빠르게 고르는 버튼들. 순서대로.',
+  res: [{ react_id: 1, text: 'ㅋㅋ', meme_id: 0, meme_url: '', position: 0 }, { react_id: 2, text: '', meme_id: 5, meme_url: 'https://…', position: 1 }], status: '200' },
 
-{ id: 'stickers-delete', name: '짤 빼기', method: 'DELETE', path: '/v1/azits/{azit_id}/stickers/{sticker_id}', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
-  screens: 'set-stickers', desc: '변경 기록에서 되돌릴 수 있게 실제로는 숨김(soft delete). 맞장구에 있으면 거기서도 빠져요.', status: '204' },
-
-{ id: 'reacts-get', name: '맞장구 목록', method: 'GET', path: '/v1/azits/{azit_id}/reacts', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
-  screens: 'chat hover 메뉴, set-stickers', desc: '순서대로. 새 아지트 기본값은 <code>ㅋㅋ, 헐, 최고, 킹받네</code>.',
-  res: { reacts: [{ id: 1, text: 'ㅋㅋ' }, { id: 3, sticker_id: 1, name: '정색', media_key: 'm_...' }] }, status: '200' },
-
-{ id: 'reacts-put', name: '맞장구 통째로 바꾸기', method: 'PUT', path: '/v1/azits/{azit_id}/reacts', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
-  screens: 'set-stickers (순서·추가·빼기)', desc: '순서 바꾸기·넣기·빼기를 전부 "최종 목록 PUT" 하나로. 기존 항목은 id 를 같이 보내야 달린 맞장구가 안 사라져요.',
-  body: { items: [{ id: 1 }, { id: 3 }, { text: '레전드' }, { sticker_id: 4 }] }, res: '맞장구 목록과 같음', status: '200',
-  errors: [['react_limit', 409, '맞장구는 8개까지예요. 하나 빼고 넣어 주세요'], ['react_min', 409, '맞장구는 1개 이상 있어야 해요'], ['react_duplicate', 409, '이미 있는 맞장구예요 / 이미 맞장구에 있는 짤이에요'], ['validation_failed', 400, '글자는 4자까지']] },
+{ id: 'reacts-put', st: 'done', name: '맞장구 목록 통째로 바꾸기', method: 'PUT', path: '/v1/azits/{azit_id}/reacts', domain: '사진·짤', mvp: 'MVP 1', auth: '세션 · admin 이상',
+  screens: 'set-stickers (순서·추가·빼기)', desc: '순서 바꾸기·넣기·빼기를 전부 "최종 목록 PUT" 하나로. 응답은 바뀐 목록.',
+  body: { reacts: [{ text: 'ㅋㅋ' }, { text: '헐' }, { meme_id: 5 }] }, res: '맞장구 목록과 같음', status: '200',
+  errors: [['bad_request', 400, '10개까지 / 같은 맞장구가 두 번 / 글자 2자까지 / 짤이 없어요'], ['forbidden', 403, '관리자만 할 수 있어요']],
+  notes: ['칸마다 글자(1~2자) 또는 이 아지트 짤 하나.', '목록을 바꿔도 메시지에 이미 달린 맞장구는 그대로 (맞장구는 목록 id 가 아니라 내용으로 저장).'] },
 
 /* ---------------- 알림 ---------------- */
 { id: 'notifs-list', name: '알림 목록', method: 'GET', path: '/v1/notifications', domain: '알림', mvp: 'MVP 2', auth: '세션',
@@ -592,7 +596,8 @@ function renderTabs() {
     `<button class="view-tab${k === view ? ' on' : ''}" data-view="${k}">${label}${counts[k] != null ? `<span class="n">${counts[k]}</span>` : ''}</button>`).join('');
 }
 
-function statusOf(id) { return statusMap[id] || 'todo'; }
+// 서버에 이미 있는 건 데이터에 st: 'done' 으로 적어 둬요. 브라우저에서 바꾼 값(statusMap)이 있으면 그게 먼저.
+function statusOf(id) { return statusMap[id] || (E.find((e) => e.id === id) || {}).st || 'todo'; }
 
 function renderTable() {
   const rows = E.filter((e) => (view === 'all' || e.mvp === view) && (!domainFilter || e.domain === domainFilter) &&
