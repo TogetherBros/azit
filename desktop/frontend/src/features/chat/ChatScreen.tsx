@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  addReaction, deleteMessage, editMessage, errorText, listMessages, markRead, removeReaction, sendMessage,
-  type MessageRes,
+  addReaction, deleteMessage, editMessage, errorText, listMessages, markRead, removeReaction, sendMessage, uploadFile,
+  type MemeRes, type MessageRes, type SendInput,
 } from '../../api/server'
-import type { ReactOption, Reaction, Room, UserMessage } from '../../api/types'
-import { newTempId, toRows, type Me, type Outgoing } from '../../lib/chat'
-import { DeleteMessageModal } from './ChatModals'
+import type { ReactOption, Reaction, Room, Sticker, UserMessage } from '../../api/types'
+import { ago, newTempId, toRows, type Me, type Outgoing } from '../../lib/chat'
+import { shrinkImage } from '../../lib/image'
+import { DeleteMessageModal, ImageModal } from './ChatModals'
 import { ChatView } from './ChatView'
+import type { ComposerPopup } from './Composer'
 
 const POLL_MS = 3000 // 웹소켓 전까지는 3초마다 새 메시지를 물어본다
 
@@ -16,13 +18,14 @@ type Props = {
   memberCount: number
   me: Me
   reactOptions: ReactOption[]
+  memes: MemeRes[] // + → 짤 에서 고를 아지트 짤
   canDeleteOthers: boolean // 관리자
   onRead?: () => void // 읽음 처리했으니 방 목록 안 읽은 수를 다시 받으라고
   onShaken?: () => void // 나를 흔든 새 메시지가 왔다
 }
 
 // 방 하나의 채팅. 서버에서 메시지를 받아 ChatView 에 넘기고, 보내기·고치기·지우기·맞장구를 처리한다.
-export function ChatScreen({ azitId, room, memberCount, me, reactOptions, canDeleteOthers, onRead, onShaken }: Props) {
+export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes, canDeleteOthers, onRead, onShaken }: Props) {
   const roomId = Number(room.id)
   const [messages, setMessages] = useState<MessageRes[]>([])
   const [hasMore, setHasMore] = useState(false)
@@ -112,9 +115,28 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, canDel
   const deliver = async (o: Outgoing) => {
     setOutgoing((os) => [...os.filter((x) => x.tempId !== o.tempId), { ...o, failed: false }])
     try {
-      const m = await sendMessage(azitId, roomId, { temp_id: o.tempId, body: o.body, shake_all: o.shakeAll })
+      let input: SendInput
+      if (o.kind === 'meme') {
+        input = { temp_id: o.tempId, kind: 'meme', meme_id: o.memeId }
+      } else if (o.kind === 'photo') {
+        // 사진은 먼저 R2 에 올린다. 올린 키는 기억해 둬서 다시 보내기 때 또 올리지 않는다
+        let key = o.photoKey
+        if (!key) {
+          if (!o.file) throw new Error('사진을 다시 골라 주세요')
+          const img = await shrinkImage(o.file, 'photo')
+          key = await uploadFile('photo', img.contentType, img.base64)
+          o = { ...o, photoKey: key }
+          const done = o
+          setOutgoing((os) => os.map((x) => (x.tempId === done.tempId ? { ...x, photoKey: key } : x)))
+        }
+        input = { temp_id: o.tempId, kind: 'photo', photo_key: key }
+      } else {
+        input = { temp_id: o.tempId, body: o.body, shake_all: o.shakeAll }
+      }
+      const m = await sendMessage(azitId, roomId, input)
       merge([m])
       setOutgoing((os) => os.filter((x) => x.tempId !== o.tempId))
+      if (o.kind === 'photo' && o.src) URL.revokeObjectURL(o.src)
     } catch (e) {
       setOutgoing((os) => os.map((x) => (x.tempId === o.tempId ? { ...x, failed: true } : x)))
       setError(errorText(e))
@@ -136,6 +158,34 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, canDel
     }
     setDraft('')
     await deliver({ tempId: newTempId(), body, at: Date.now(), shakeAll: body.includes('@전체') })
+  }
+
+  // + 메뉴: 짤 고르기 · 사진 고르기
+  const [popup, setPopup] = useState<ComposerPopup>(null)
+  const [viewing, setViewing] = useState<string>() // 크게 보는 사진
+
+  const stickers: Sticker[] = useMemo(
+    () => memes.map((m) => ({ id: String(m.meme_id), name: m.name, src: m.url, by: '', ago: ago(m.created_at) })),
+    [memes],
+  )
+
+  // 맞장구 고르기 창 아래 칸: 아지트 짤 전부 (맞장구 목록에 없어도 달 수 있다)
+  const memeOptions: ReactOption[] = useMemo(
+    () => memes.map((m) => ({ id: `m${m.meme_id}`, img: m.url, name: m.name, memeId: m.meme_id })),
+    [memes],
+  )
+
+  const sendMeme = (id: string) => {
+    const m = memes.find((x) => String(x.meme_id) === id)
+    if (!m) return
+    setPopup(null)
+    void deliver({ tempId: newTempId(), body: '', at: Date.now(), kind: 'meme', memeId: m.meme_id, src: m.url, name: m.name })
+  }
+
+  const sendPhoto = (file: File) => {
+    setPopup(null)
+    if (file.size > 30 << 20) { setError('사진이 너무 커요'); return } // 줄이기 전 원본. 줄인 뒤 10MB 는 서버가 본다
+    void deliver({ tempId: newTempId(), body: '', at: Date.now(), kind: 'photo', file, src: URL.createObjectURL(file) })
   }
 
   const retry = (msg: UserMessage) => {
@@ -208,16 +258,25 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, canDel
       onEdit={onEdit}
       onDelete={onDelete}
       onRetry={retry}
+      onImage={setViewing}
+      memeOptions={memeOptions}
       canDelete={canDeleteOthers}
       composer={{
         value: draft,
         editing: !!editing,
+        popup,
+        stickers,
         onChange: setDraft,
         onSend: () => void send(),
         onCancelEdit: () => { setEditing(undefined); setDraft('') },
+        onPlus: () => setPopup(popup ? null : 'plus'),
+        onPopup: setPopup,
+        onSticker: sendMeme,
+        onPhoto: sendPhoto,
       }}
     />
     {deleting && <DeleteMessageModal busy={deleteBusy} onCancel={() => setDeleting(undefined)} onConfirm={() => void confirmDelete()} />}
+    {viewing && <ImageModal src={viewing} onClose={() => setViewing(undefined)} />}
     </>
   )
 }

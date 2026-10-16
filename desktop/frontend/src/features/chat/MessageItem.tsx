@@ -1,22 +1,29 @@
+import { useCallback, useState, type MouseEvent } from 'react'
 import type { ChatMessage, LiarCard, MessagePart, PollCard, Reaction, ReactOption, RouletteCard, UserMessage } from '../../api/types'
 import { Avatar } from '../../components/Avatar'
 import { Icon } from '../../components/Icon'
+import { ReactPicker } from './ReactPicker'
 
 type Props = {
   msg: ChatMessage
   cont?: boolean // 같은 사람이 이어 보낸 메시지 → 아바타·이름 생략
   showTime?: boolean // 묶음의 마지막 → 시간 표시
   reactOptions: ReactOption[] // 이 아지트의 맞장구 (최대 10개)
+  memeOptions?: ReactOption[] // 아지트 짤 전부 (맞장구 고르기 창 아래 칸)
   onReact?: (msg: UserMessage, r: ReactOption) => void // 메뉴에서 맞장구 달기
   onToggle?: (msg: UserMessage, r: Reaction) => void // 달린 맞장구 누르기 (내 거면 떼기)
   onEdit?: (msg: UserMessage) => void
   onDelete?: (msg: UserMessage) => void
   onRetry?: (msg: UserMessage) => void
+  onImage?: (src: string) => void // 사진 크게 보기
   canDelete?: boolean // 남의 메시지도 지울 수 있는지 (관리자)
 }
 
 // 메시지 한 줄. 시스템 메시지(입장, 흔들기 알림)는 가운데 알약 모양.
-export function MessageItem({ msg, cont, showTime, reactOptions, onReact, onToggle, onEdit, onDelete, onRetry, canDelete }: Props) {
+export function MessageItem({ msg, cont, showTime, reactOptions, memeOptions = [], onReact, onToggle, onEdit, onDelete, onRetry, onImage, canDelete }: Props) {
+  const [picker, setPicker] = useState<HTMLElement | null>(null) // 열린 맞장구 고르기 창의 기준 버튼
+  const closePicker = useCallback(() => setPicker(null), [])
+
   if (msg.kind === 'sys') {
     return (
       <div className="sysm">
@@ -28,6 +35,12 @@ export function MessageItem({ msg, cont, showTime, reactOptions, onReact, onTogg
   }
 
   const { author, mine } = msg
+  const canReact = !!onReact && !msg.deleted && !msg.pending && !msg.failed
+  const isOn = (o: ReactOption) => !!msg.reactions?.some((r) => r.on && (o.memeId ? r.memeId === o.memeId : r.text === o.text))
+  const togglePicker = (e: MouseEvent<HTMLButtonElement>) => {
+    const el = e.currentTarget
+    setPicker((cur) => (cur === el ? null : el))
+  }
 
   return (
     <div className={`msg${mine ? ' me' : ''}${msg.pending ? ' pending' : ''}`}>
@@ -48,7 +61,7 @@ export function MessageItem({ msg, cont, showTime, reactOptions, onReact, onTogg
         )}
 
         <div className="msg-line">
-          <Body msg={msg} />
+          <Body msg={msg} onImage={onImage} />
           {msg.failed
             ? <button type="button" className="plain msg-failed" onClick={onRetry && (() => onRetry(msg))}>못 보냈어요 · 다시 보내기</button>
             : (showTime || msg.edited) && (
@@ -62,41 +75,70 @@ export function MessageItem({ msg, cont, showTime, reactOptions, onReact, onTogg
           <div className="msg-reacts">
             {msg.reactions.map((r) => (
               <button key={r.label} type="button" className={`react${r.on ? ' on' : ''}`} aria-pressed={!!r.on} aria-label={`${r.label} ${r.count}`} title={r.img ? r.label : undefined} onClick={onToggle && (() => onToggle(msg, r))}>
-                {r.img ? <img className="rimg" src={r.img} alt="" /> : r.label} {r.count}
+                {r.img ? <img className="rimg" src={r.img} alt="" /> : <span className="react-label">{r.label}</span>}
+                <span className="react-n">{r.count}</span>
               </button>
             ))}
+            {canReact && (
+              <button type="button" className="react add" aria-label="맞장구 달기" title="맞장구 달기" onClick={togglePicker}>
+                <Icon name="smile" size={15} />
+              </button>
+            )}
           </div>
         )}
       </div>
 
       {!msg.deleted && !msg.pending && !msg.failed && (
-        <div className="acts" role="group" aria-label="맞장구">
-          {reactOptions.map((r) => (
-            <button key={r.id} type="button" aria-label={r.text ?? r.name} title={r.name} onClick={onReact && (() => onReact(msg, r))}>
+        <div className={`acts${picker ? ' open' : ''}`} role="group" aria-label="메시지 메뉴">
+          {/* 미리보기 화면(onReact 없음)은 예전처럼 맞장구 목록을 그대로 보여 준다 */}
+          {!onReact && reactOptions.map((r) => (
+            <button key={r.id} type="button" aria-label={r.text ?? r.name} title={r.name}>
               {r.img ? <img className="rimg" src={r.img} alt="" /> : r.text}
             </button>
           ))}
           {!onReact && (msg.kind === 'image' || msg.kind === 'sticker') && <button type="button" className="lime">짤로 저장</button>}
           {!onReact && !mine && <button type="button">흔들며 답하기</button>}
-          {mine && onEdit && msg.kind === 'text' && <button type="button" onClick={() => onEdit(msg)}>고치기</button>}
+          {canReact && (
+            <button type="button" className="ic" aria-label="맞장구" title="맞장구" aria-expanded={!!picker} onClick={togglePicker}>
+              <Icon name="smile" size={17} />
+            </button>
+          )}
+          {mine && onEdit && msg.kind === 'text' && (
+            <button type="button" className="ic" aria-label="고치기" title="고치기" onClick={() => onEdit(msg)}>
+              <Icon name="edit" size={16} />
+            </button>
+          )}
           {(mine || canDelete) && (msg.kind === 'text' || msg.kind === 'image' || msg.kind === 'sticker') && (
-            <button type="button" className="red" onClick={onDelete && (() => onDelete(msg))}>지우기</button>
+            <button type="button" className="ic red" aria-label="지우기" title="지우기" onClick={onDelete && (() => onDelete(msg))}>
+              <Icon name="trash" size={16} />
+            </button>
           )}
         </div>
+      )}
+
+      {picker && onReact && (
+        <ReactPicker
+          anchor={picker}
+          reacts={reactOptions}
+          memes={memeOptions}
+          isOn={isOn}
+          onPick={(o) => onReact(msg, o)}
+          onClose={closePicker}
+        />
       )}
     </div>
   )
 }
 
 // 종류별 본문
-function Body({ msg }: { msg: UserMessage }) {
+function Body({ msg, onImage }: { msg: UserMessage; onImage?: (src: string) => void }) {
   if (msg.deleted) return <div className="bub deleted">지운 메시지</div>
   switch (msg.kind) {
     case 'text':
       return <div className="bub"><Parts parts={msg.parts} /></div>
     case 'image':
       return (
-        <button type="button" className="plain" aria-label="사진 크게 보기">
+        <button type="button" className="plain" aria-label="사진 크게 보기" onClick={onImage && (() => onImage(msg.src))}>
           <img className="msg-img" src={msg.src} alt="사진" />
         </button>
       )

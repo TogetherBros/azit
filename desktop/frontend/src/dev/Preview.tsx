@@ -134,6 +134,10 @@ const SCREENS: Record<string, () => ReactNode> = {
   // 채팅
   'chat': () => <App />,
   'chat-plus': () => <App chat={{ composer: { popup: 'plus' } }} />,
+  // 실제 화면처럼 맞장구 칩의 + 나 메뉴의 웃음 버튼을 누르면 고르기 창이 뜬다
+  'chat-react': () => (
+    <App chat={{ onReact: () => {}, onToggle: () => {}, memeOptions: M.STICKERS.map((s) => ({ id: `m${s.id}`, img: s.src, name: s.name, memeId: Number(s.id.replace(/\D/g, '')) || 1 })) }} />
+  ),
   'chat-mention': () => <App chat={{ composer: { draft: '@강', popup: 'mention', mentionCandidates: OTHERS.slice(0, 3) } }} />,
   'chat-sticker': () => <App chat={{ composer: { popup: 'sticker' } }} />,
   'chat-games': () => <App chat={{ composer: { popup: 'games' } }} />,

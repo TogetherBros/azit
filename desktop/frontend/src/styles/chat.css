@@ -73,23 +73,63 @@
 .mention.mine { background: var(--lime); color: var(--on-accent); }
 .me .mention { background: var(--bg); color: var(--lime); }
 
-/* 맞장구 (메시지 아래 붙은 것) */
+/* 맞장구 (메시지 아래 붙은 것). 디스코드처럼 [글자 · 숫자] 칩. 글자는 라임 디스플레이체, 숫자는 흐린 고정폭이라 둘이 섞여 읽히지 않는다 */
 .react {
   height: 26px;
-  padding: 0 9px;
+  padding: 0 8px;
   border-radius: 13px;
-  border: 1.5px solid var(--line2);
-  background: transparent;
-  font-size: 12px;
-  font-weight: 800;
+  border: 1px solid var(--line);
+  background: var(--s2);
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  transition: border-color .12s, background .12s;
 }
-.react.on { border-color: var(--lime); color: var(--lime); }
-.rimg { width: 18px; height: 18px; object-fit: contain; }
+.react:hover { border-color: var(--line-dash); }
+.react-label { font-family: var(--font-disp); font-size: 13px; line-height: 1; color: var(--lime); white-space: nowrap; }
+.react-n { font-family: var(--font-mono); font-size: 12px; line-height: 1; color: var(--mu); }
+.react.on { background: var(--limebg); border-color: var(--lime); }
+.react.on .react-n { color: var(--lime); }
+.react.on:hover { border-color: var(--lime); filter: brightness(1.15); }
+.react.add { width: 34px; padding: 0; justify-content: center; color: var(--mu); }
+.react.add:hover { color: var(--tx); }
+.rimg { width: 20px; height: 20px; object-fit: contain; }
 
-/* 마우스 올리면 오른쪽 위에 뜨는 메뉴: 맞장구들 · 흔들며 답하기 · 지우기 */
+/* 맞장구 고르기 창: 위 칸은 아지트 맞장구 목록(최대 10개, 5칸씩), 아래 칸은 아지트 짤 전부 */
+.rpick {
+  position: fixed;
+  z-index: 30;
+  width: 268px;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid var(--line2);
+  background: var(--s2);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rpick-cap { padding: 2px 2px 0; font-size: 11px; font-weight: 800; color: var(--mu); }
+.rpick-grid { display: grid; grid-template-columns: repeat(5, 44px); gap: 6px; }
+.rpick-memes { max-height: 150px; overflow-y: auto; padding-right: 2px; }
+.rpick-empty { padding: 2px 2px 4px; }
+.rpick-tile {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1.5px solid transparent;
+  background: var(--s3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.rpick-tile:hover { border-color: var(--line-dash); }
+.rpick-tile.on { background: var(--limebg); border-color: var(--lime); }
+.rpick-tile img { width: 34px; height: 34px; object-fit: contain; }
+.rpick-text { font-family: var(--font-disp); font-size: 13px; line-height: 1.1; color: var(--lime); text-align: center; word-break: keep-all; }
+
+/* 마우스 올리면 오른쪽 위에 뜨는 메뉴: 맞장구 · 고치기 · 지우기 (아이콘만) */
 .acts {
   display: none;
   position: absolute;
@@ -103,7 +143,10 @@
   background: var(--s2);
   box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
 }
-.msg:hover .acts, .msg:focus-within .acts { display: flex; }
+.msg:hover .acts, .msg:focus-within .acts, .acts.open { display: flex; }
+.acts button.ic { width: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--mu); }
+.acts button.ic:hover { color: var(--tx); }
+.acts button.ic.red { color: var(--red); }
 .acts button { height: 30px; padding: 0 9px; border: 0; border-radius: 9px; background: transparent; font-size: 12px; font-weight: 800; }
 .acts button:hover { background: var(--s3); }
 .acts .lime { color: var(--lime); }

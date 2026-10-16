@@ -2,7 +2,7 @@
 export type IconName =
   | 'shake' | 'search' | 'plus' | 'gear' | 'bell' | 'send' | 'back'
   | 'x' | 'check' | 'chev' | 'wide' | 'narrow' | 'menu' | 'game' | 'star'
-  | 'min' | 'max'
+  | 'min' | 'max' | 'smile' | 'edit' | 'trash'
 
 const PATHS: Partial<Record<IconName, string>> = {
   shake: 'M2 12l3-6 4 12 4-12 4 12 3-6h2',
@@ -19,6 +19,8 @@ const PATHS: Partial<Record<IconName, string>> = {
   menu: 'M4 7h16M4 12h16M4 17h16',
   min: 'M5 12h14',
   max: 'M5 5h14v14H5z',
+  edit: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',
+  trash: 'M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v5M14 11v5',
 }
 
 type Props = { name: IconName; size?: number; stroke?: number }
@@ -45,6 +47,11 @@ export function Icon({ name, size = 18, stroke = 2.2 }: Props) {
         <>
           <rect x="2" y="6" width="20" height="12" rx="5" />
           <path d="M7 10v4M5 12h4" />
+        </>
+      ) : name === 'smile' ? (
+        <>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01" />
         </>
       ) : name === 'star' ? (
         <path d="M12 2l3 7 7 .6-5.3 4.6 1.6 7-6.3-3.8-6.3 3.8 1.6-7L2 9.6 9 9z" fill="currentColor" />
