@@ -251,8 +251,8 @@ const E = [
 
 /* ---------------- 아지트 ---------------- */
 { id: 'azits-list', name: '내 아지트 목록', method: 'GET', path: '/v1/azits', domain: '아지트', mvp: 'MVP 1', auth: '세션',
-  screens: '왼쪽 레일', desc: '레일 네모들. 들어온 순서대로. <code>unread</code>는 모든 방 안 읽은 수 합.',
-  res: { azits: [{ id: 1, name: '의성읍시회축구단이낚시하다낚은강아지를키워봅세', short: '의성', color: '#D4FF3A', desc: '낚시하다 강아지 낚은 사람들의 모임', member_count: 14, unread: 0, landing_room_id: 1, me: { nick: '4n5rud', color: '#D4FF3A', title: '눈치 백단' } }] },
+  screens: '왼쪽 레일, 홈 카드', desc: '레일 네모들. 들어온 순서대로. <code>unread</code>는 모든 방 안 읽은 수 합, <code>online_count</code>는 지금 앱을 켜 둔 멤버 수 (허브 연결 기준).',
+  res: { azits: [{ id: 1, name: '의성읍시회축구단이낚시하다낚은강아지를키워봅세', short: '의성', color: '#D4FF3A', desc: '낚시하다 강아지 낚은 사람들의 모임', member_count: 14, online_count: 3, unread: 0, landing_room_id: 1, me: { nick: '4n5rud', color: '#D4FF3A', title: '눈치 백단' } }] },
   status: '200' },
 
 { id: 'azits-create', name: '아지트 만들기', method: 'POST', path: '/v1/azits', domain: '아지트', mvp: 'MVP 1', auth: '세션',
@@ -276,7 +276,7 @@ const E = [
   status: '200',
   extra: [['소개와 배너 지우기', { description: '', banner_key: '' }]],
   errors: [['forbidden', 403, '관리자만 바꿀 수 있어요'], ['bad_request', 400, '아지트 이름을 넣어 주세요 / 20자까지 / 고를 수 있는 색이 아니에요 / 소개는 40자까지예요 / 내 사진이 아니에요 / 업로드가 아직 안 끝났어요'], ['not_found', 404, '(멤버가 아님)']],
-  notes: ['배너: <code>POST /v1/uploads</code> (kind=azit_banner) → R2 PUT → 받은 키를 <code>banner_key</code>로. 내가 올린 <code>azit-banners/{내 id}/</code> 키만 받아요.', '이름·소개는 앞뒤 공백을 잘라요. 색은 대문자로 맞춰요.', '이름 바꾸기 쿨다운, 변경 기록은 아직 없어요 (변경 기록 기능 때 같이).'],
+  notes: ['배너: <code>POST /v1/uploads</code> (kind=azit_banner) → R2 PUT → 받은 키를 <code>banner_key</code>로. 내가 올린 <code>azit-banners/{내 id}/</code> 키만 받아요.', '이름·소개는 앞뒤 공백을 잘라요. 색은 대문자로 맞춰요.', '바꾸면 변경 기록(azit.info)에 남고 되돌릴 수 있어요. 이름 바꾸기 쿨다운은 아직 없어요.'],
   go: ['PATCH 는 "안 보낸 필드"와 "빈 값"을 구분해야 해요. 구조체 필드를 포인터(<code>*string</code>)로 두면 nil = 안 보냄.'] },
 
 /* ---------------- 초대 코드 ---------------- */
@@ -315,7 +315,8 @@ const E = [
  * 실제 서버 코드 기준 (2026-10-16). server/internal/member/handler.go. 전부 member.RequireMember 뒤 (멤버가 아니면 404). */
 { id: 'members-list', st: 'done', name: '멤버 목록', method: 'GET', path: '/v1/azits/{azit_id}/members', domain: '멤버', mvp: 'MVP 1', auth: '세션',
   screens: 'set-members', desc: '지금 들어와 있는 멤버 전부. 만든 사람 → 관리자 → 멤버 순, 같은 역할이면 들어온 순. 이름·색·사진·소개는 계정 것, 닉네임은 이 아지트 것.',
-  res: [{ account_id: 2, name: 'friend_2', nickname: '강백호', color: '#7BC4FF', avatar_url: '', banner_url: '', bio: '', role: 'member', joined_at: '2026-10-16T05:00:00Z' }], status: '200' },
+  res: [{ account_id: 2, name: 'friend_2', nickname: '강백호', color: '#7BC4FF', avatar_url: '', banner_url: '', bio: '', role: 'member', joined_at: '2026-10-16T05:00:00Z', online: true }], status: '200',
+  notes: ['<code>online</code>: 지금 앱을 켜 두었는지 (웹소켓 연결이 하나라도 있으면 true). 바뀌면 <code>presence</code> 이벤트.'] },
 
 { id: 'member-me-patch', st: 'done', name: '이 아지트 내 닉네임 바꾸기', method: 'PATCH', path: '/v1/azits/{azit_id}/members/me', domain: '멤버', mvp: 'MVP 1', auth: '세션',
   screens: 'set-members', desc: '들어올 때 계정 닉네임이 복사되고, 여기서 이 아지트 것만 바꿔요. 앞뒤 공백은 지워요. 겹쳐도 돼요.',
@@ -332,14 +333,25 @@ const E = [
   errors: [['forbidden', 403, '만든 사람만 역할을 바꿀 수 있어요 / 만든 사람의 역할은 바꿀 수 없어요'], ['bad_request', 400, '관리자나 멤버만 고를 수 있어요 / 나 자신에게는 할 수 없어요'], ['not_found', 404, '이 아지트 멤버가 아니에요']] },
 
 { id: 'member-kick', st: 'done', name: '멤버 내보내기', method: 'DELETE', path: '/v1/azits/{azit_id}/members/{account_id}', domain: '멤버', mvp: 'MVP 1', auth: '세션 · admin 이상',
-  screens: 'set-members', desc: '나보다 역할이 낮은 사람만 (관리자 → 멤버, 만든 사람 → 관리자·멤버). 나가기와 똑같이 <code>left_at</code>만 채워요. 초대 코드가 있으면 다시 들어올 수 있어요 (막기 없음).', status: '204',
+  screens: 'set-members', desc: '나보다 역할이 낮은 사람만 (관리자 → 멤버, 만든 사람 → 관리자·멤버). 나가기와 똑같이 <code>left_at</code>만 채워요. 몸통에 <code>{"ban": true}</code>를 주면 막기도 해서 새 초대 코드로도 못 들어와요 (같은 트랜잭션). 몸통이 없으면 그냥 내보내기.',
+  body: { ban: true }, status: '204',
   errors: [['forbidden', 403, '관리자만 내보낼 수 있어요 / 나보다 역할이 낮은 사람만 내보낼 수 있어요'], ['bad_request', 400, '나 자신에게는 할 수 없어요'], ['not_found', 404, '이 아지트 멤버가 아니에요']] },
+
+{ id: 'bans-list', st: 'done', name: '막은 사람 목록', method: 'GET', path: '/v1/azits/{azit_id}/bans', domain: '멤버', mvp: 'MVP 2', auth: '세션 · admin 이상',
+  screens: 'set-members "다시 못 들어오는 사람"', desc: '최근에 막은 순.',
+  res: [{ account_id: 9, name: 'spam', nickname: '도배왕', banned_by_nickname: '강백호', banned_at: '2026-10-17T05:00:00Z' }], status: '200',
+  errors: [['forbidden', 403, '관리자만 볼 수 있어요']] },
+
+{ id: 'bans-delete', st: 'done', name: '막은 것 풀기', method: 'DELETE', path: '/v1/azits/{azit_id}/bans/{account_id}', domain: '멤버', mvp: 'MVP 2', auth: '세션 · admin 이상',
+  screens: 'set-members [풀기]', desc: '풀어도 바로 멤버가 되진 않아요. 새 초대 코드로 다시 들어와야 해요. 변경 기록에 남고, 되돌리면 다시 막아요.', status: '204',
+  errors: [['forbidden', 403, '관리자만 풀 수 있어요'], ['not_found', 404, '막은 사람이 아니에요']],
+  notes: ['막힌 사람이 초대 코드로 들어오려 하면 <code>POST /v1/invites/{code}/join</code> 이 403 "이 아지트에는 들어갈 수 없어요".'] },
 
 /* ---------------- 방 ----------------
  * 여기서부터 사진·짤까지는 실제 서버 코드 기준 (2026-10-16). 경로는 전부 /v1/azits/{azit_id} 아래이고,
  * 아지트 멤버가 아니면 404 (아지트가 있는지조차 숨김). member.RequireMember 미들웨어가 막아요. */
 { id: 'rooms-list', st: 'done', name: '방 목록', method: 'GET', path: '/v1/azits/{azit_id}/rooms', domain: '방', mvp: 'MVP 1', auth: '세션',
-  screens: '방 목록, mini-rooms, set-rooms', desc: '<code>position</code> 순서 (작을수록 위). <code>unread</code>는 내가 안 읽은 메시지 수 — 내가 보낸 것, 지운 것은 빼요.',
+  screens: '방 목록, mini-rooms, set-rooms', desc: '<code>position</code> 순서 (작을수록 위). <code>is_default</code>: 아지트를 만들 때 생긴 기본 방 (못 지움). <code>unread</code>는 내가 안 읽은 메시지 수 — 내가 보낸 것, 지운 것은 빼요.',
   res: [ROOM], status: '200',
   notes: ['기본 방 <code>아지트</code>는 아지트를 만들 때 자동으로 생겨요.', '안 읽은 수는 <code>room_reads.last_read_message_id</code>보다 큰 메시지를 세요.'],
   go: ['room 이 message 를 import 하면 순환 import (message 가 이미 room 을 씀). 그래서 room 에 <code>UnreadCounter</code> 인터페이스를 두고 wire.go 에서 <code>message.Repository</code>를 꽂아요 — 스프링의 인터페이스 의존 + DI.'] },
@@ -357,6 +369,10 @@ const E = [
   screens: 'set-rooms (끌어서 옮기기)', desc: '그 아지트 방 전부를 새 순서대로 보내요. 응답은 바뀐 방 목록 전체.',
   body: { room_ids: [3, 1, 2] }, res: '방 목록과 같음', status: '200',
   errors: [['bad_request', 400, '(빠진 방이나 남의 방이 섞임)'], ['forbidden', 403, '관리자만 할 수 있어요']] },
+
+{ id: 'room-delete', st: 'done', name: '방 지우기', method: 'DELETE', path: '/v1/azits/{azit_id}/rooms/{room_id}', domain: '방', mvp: 'MVP 2', auth: '세션 · admin 이상',
+  screens: 'set-rooms [방 지우기]', desc: '방을 숨겨요 (<code>rooms.deleted_at</code>). 메시지는 DB 에 남고, 지운 방은 목록·메시지·안 읽은 수에서 빠져요. 변경 기록(room.delete)에서 되돌리면 맨 아래로 다시 나와요. 아지트를 만들 때 생긴 기본 방(<code>is_default</code>, 가장 작은 room_id)은 이름은 바꿔도 지울 수는 없어요. 실시간 <code>azit.changed</code> rooms.', status: '204',
+  errors: [['forbidden', 403, '관리자만 할 수 있어요'], ['bad_request', 400, '기본 방은 지울 수 없어요 / 마지막 남은 방은 지울 수 없어요'], ['not_found', 404, '방을 찾을 수 없어요']] },
 
 { id: 'room-read', st: 'done', name: '여기까지 읽음', method: 'POST', path: '/v1/azits/{azit_id}/rooms/{room_id}/read', domain: '방', mvp: 'MVP 1', auth: '세션',
   screens: '채팅 화면 열기·스크롤', desc: '화면에 보인 가장 아래 메시지 id 로 불러요. 읽은 위치는 앞으로만 가요 (더 작은 id 가 오면 무시).',
@@ -427,6 +443,11 @@ const E = [
   errors: [['bad_request', 400, '짤 이름을 입력해 주세요 / 20자까지 / 올린 짤을 찾을 수 없어요']],
   notes: ['key 가 <b>내</b> 폴더(<code>memes/{내 id}/</code>)인지, R2 에 실제로 올라가 있는지(HEAD) 확인해요.'] },
 
+{ id: 'memes-from-message', st: 'done', name: '채팅 사진을 짤로 저장', method: 'POST', path: '/v1/azits/{azit_id}/memes/from-message', domain: '사진·짤', mvp: 'MVP 2', auth: '세션',
+  screens: '메시지 메뉴 [짤로 저장]', desc: '사진(또는 짤) 메시지의 그림을 R2 안에서 내 짤 폴더(<code>memes/{내 id}/</code>)로 <b>복사</b>해서 짤로 등록해요. 원래 메시지를 지워도 짤은 남아요.',
+  body: { message_id: 812, name: '킹받네' }, res: '짤 모음의 한 항목', status: '201',
+  errors: [['bad_request', 400, '짤 이름을 입력해 주세요 / 20자까지 / 짤로 저장할 사진이 없어요']] },
+
 { id: 'memes-delete', st: 'done', name: '짤 지우기', method: 'DELETE', path: '/v1/azits/{azit_id}/memes/{meme_id}', domain: '사진·짤', mvp: 'MVP 1', auth: '세션 · 올린 사람 또는 admin 이상',
   screens: 'set-stickers', desc: '숨김(soft delete). 맞장구 목록에 있으면 거기서도 빠져요. 이미 메시지에 달린 짤 맞장구는 계속 보여요.', status: '204',
   errors: [['forbidden', 403, '올린 사람이나 관리자만 지울 수 있어요'], ['not_found', 404, '짤이 없어요']] },
@@ -453,23 +474,23 @@ const E = [
     '<code>unread</code>는 50개 밖의 것도 세요.',
   ] },
 
-{ id: 'notifs-read', name: '알림 읽음', method: 'POST', path: '/v1/notifications/{id}/read', domain: '알림', mvp: 'MVP 2', auth: '세션',
-  screens: 'activity 항목 누르기', desc: '(아직 없음) 지금은 "모두 읽음"만 있어요.', status: '204' },
+{ id: 'notifs-read', st: 'done', name: '알림 읽음', method: 'POST', path: '/v1/notifications/{id}/read', domain: '알림', mvp: 'MVP 2', auth: '세션',
+  screens: 'activity 항목 누르기', desc: '그 알림 하나만 읽음. 내 알림이 아니거나 이미 읽었으면 아무 일 없이 204. 알림 화면을 여는 것만으로는 읽음이 안 돼요.', status: '204' },
 
 { id: 'notifs-read-all', st: 'done', name: '알림 모두 읽음', method: 'POST', path: '/v1/notifications/read-all', domain: '알림', mvp: 'MVP 2', auth: '세션',
   screens: 'activity [모두 읽음], 알림 화면 열기', desc: '내 알림을 전부 읽음으로. 앱은 알림 화면을 열 때 불러요.', status: '204' },
 
 /* ---------------- 변경 기록 ---------------- */
-{ id: 'log-list', name: '변경 기록', method: 'GET', path: '/v1/azits/{azit_id}/log', domain: '변경 기록', mvp: 'MVP 2', auth: '세션',
-  screens: 'set-log', desc: '모두 주인이라 누가 뭘 바꿨는지 전부. 최근 순.',
-  query: [['type', 'string', '방 | 짤 | 맞장구 | 코드 | 멤버 | 설정 (영문: room, sticker, react, code, member, setting)'], ['before_id', 'int', '더 보기']],
-  res: { entries: [{ id: 77, type: 'room', by: 2, by_nick: '강백호', action: 'room.archive', target: { room_id: 9, name: '테스트ㅋㅋ' }, undoable: true, undone_by: null, created_at: '2026-10-07T04:50:00Z' }] }, status: '200' },
+{ id: 'log-list', st: 'done', name: '변경 기록', method: 'GET', path: '/v1/azits/{azit_id}/log', domain: '변경 기록', mvp: 'MVP 2', auth: '세션',
+  screens: 'set-log', desc: '멤버 누구나 봐요. 최근 순 100개. 꼬리표 거르기(방·짤·…)는 앱이 <code>kind</code>로 해요.',
+  res: [{ entry_id: 77, kind: 'room.rename', actor_nickname: '강백호', summary: '방 이름을 "테스트"에서 "게임방"으로 바꿈', created_at: '2026-10-19T04:50:00Z', undoable: true, undone_at: null, undone_by_nickname: '' }], status: '200',
+  notes: ['<code>kind</code>: azit.info, room.create, room.rename, room.order, room.delete, member.role, member.kick, member.unban, meme.create, meme.delete, reacts.update', '<code>undoable</code>: 되돌리는 법이 있고 아직 안 되돌린 것 (room.create, meme.create 는 false).'] },
 
-{ id: 'log-undo', name: '되돌리기', method: 'POST', path: '/v1/azits/{azit_id}/log/{entry_id}/undo', domain: '변경 기록', mvp: 'MVP 2', auth: '세션',
-  screens: 'set-log, 토스트 [되돌리기]', desc: '<code>audit_log.undo_json</code>에 적어 둔 "반대 동작"을 실행하고, 되돌린 것도 새 기록으로 남겨요.', status: '200',
-  res: { entry_id: 77, undone_by: 1 },
-  errors: [['already_undone', 409, '이미 되돌린 기록이에요'], ['not_undoable', 409, '(코드 폐기 등 되돌릴 수 없는 기록)'], ['undo_conflict', 409, '그 뒤에 또 바뀌어서 되돌릴 수 없어요']],
-  go: ['undo_json 예: <code>{"op":"room.archive","room_id":9,"value":false}</code> → <code>switch op</code> 로 처리. 동작마다 인터페이스로 뽑아 보는 연습도 좋아요.'] },
+{ id: 'log-undo', st: 'done', name: '되돌리기', method: 'POST', path: '/v1/azits/{azit_id}/log/{entry_id}/undo', domain: '변경 기록', mvp: 'MVP 2', auth: '세션 · admin 이상',
+  screens: 'set-log [되돌리기]', desc: '기록에 적어 둔 "바꾸기 전 값"(before_json)으로 되돌리고, 그 기록에 되돌린 사람·시각을 남겨요. 실시간 <code>azit.changed</code> 도 같이 가요.', status: '200',
+  res: '변경 기록의 한 항목 (undone_at 채워짐)',
+  errors: [['forbidden', 403, '관리자만 되돌릴 수 있어요'], ['bad_request', 400, '이미 되돌린 기록이에요 / 되돌릴 수 없는 기록이에요 / 되돌리지 못했어요: …'], ['not_found', 404, '변경 기록이 없어요']],
+  go: ['<code>internal/changelog</code>: 종류(kind)마다 되돌리는 함수(<code>Undoer</code>)를 <code>Handle</code>로 등록 (<code>server/undo.go</code>). 저장소가 멤버·방 패키지를 몰라도 돼서 import 순환이 없어요.'] },
 
 /* ---------------- 돌림판·투표 ---------------- */
 { id: 'roulette-create', name: '돌림판 돌리기', method: 'POST', path: '/v1/rooms/{room_id}/roulettes', domain: '돌림판·투표', mvp: 'MVP 3', auth: '세션',
@@ -524,37 +545,28 @@ const E = [
   go: ['시간 제한은 판마다 <code>time.AfterFunc</code> 또는 판 하나당 고루틴 + <code>select { case act := &lt;-actions: … case &lt;-timer.C: … }</code>. 로드맵 5단계 select 실습으로 딱 좋아요.'] },
 
 /* ---------------- 실시간 ---------------- */
-{ id: 'ws', name: '실시간 연결', method: 'WS', path: '/v1/ws', domain: '실시간', mvp: 'MVP 1', auth: '세션',
-  screens: '앱 켜져 있는 동안 항상', desc: '서버 → 앱 한 방향. 내가 속한 <b>모든 아지트</b>의 이벤트가 와요 (방 구독 개념 없음). 앱이 보내는 건 WebSocket 핑뿐이고, 행동은 전부 HTTP 로.',
-  body: '요청 헤더\nAuthorization: Bearer az_s_Vx9...\nX-Azit-Protocol: 1',
-  res: { type: 'hello', data: { protocol: 1, server_time: '2026-10-07T05:00:00Z', account_id: 1 } }, status: '101 Switching Protocols',
-  notes: ['모든 이벤트는 <code>{"type": "...", "data": {...}}</code> 봉투. 목록은 "실시간 이벤트" 탭.', '서버 핑 30초, 응답 없으면 끊음. 앱은 1초 → 2초 → 4초 … 최대 30초로 다시 연결.', '재접속 절차는 "공통 규칙" 탭의 <b>빠진 메시지 채우기</b>.'],
-  go: ['라이브러리: <code>github.com/coder/websocket</code> (표준 라이브러리엔 없어요).', '연결 하나 = 읽기 고루틴 + 쓰기 고루틴 + 보낼 것 담는 <code>chan []byte</code>(버퍼 있음). 버퍼가 차면 느린 클라이언트로 보고 끊어요 — 그래야 한 명 때문에 전체 배달이 안 막혀요.', '이게 <code>internal/hub</code>. 로드맵 5·6단계의 본진.'] },
+{ id: 'ws', st: 'done', name: '실시간 연결', method: 'WS', path: '/v1/ws', domain: '실시간', mvp: 'MVP 1', auth: '세션',
+  screens: '앱 켜져 있는 동안 항상', desc: '서버 → 앱 한 방향. 내가 속한 <b>모든 아지트</b>의 이벤트가 와요 (방 구독 개념 없음). 앱이 보내는 건 없고, 행동은 전부 HTTP 로.',
+  body: '요청 헤더\nAuthorization: Bearer {AT}',
+  res: { type: 'message.created', data: '메시지 하나 (메시지 보내기 응답과 같은 모양)' }, status: '101 Switching Protocols (토큰 없거나 만료면 401)',
+  notes: [
+    '모든 이벤트는 <code>{"type": "...", "data": {...}}</code> 봉투. 지금 오는 건 3가지예요 ("실시간 이벤트" 탭).',
+    '받는 사람은 서버 핸들러가 정해요: 새 메시지·변경은 그 아지트 지금 멤버 전원(보낸 사람 포함), 알림은 받는 사람 한 명.',
+    '서버가 30초마다 ping, 70초 동안 아무것도(pong 포함) 안 오면 끊어요. 한 연결에 못 보낸 이벤트가 32개 쌓이면 느린 연결로 보고 끊어요.',
+    '앱(desktop Go)은 끊기면 1초 → 2초 → 4초 … 최대 30초 간격으로 다시 붙고, 붙을 때마다 React 에 <code>rt:open</code>을 보내서 목록을 HTTP 로 다시 받게 해요 (끊겨 있던 사이 메우기). 로그인·로그아웃하면 새 계정으로 다시 붙어요.',
+    '앱은 혹시 놓친 걸 메우려고 30초마다 목록도 다시 받아요 (예전 3초 폴링 대신).',
+  ],
+  go: ['서버: <code>github.com/gofiber/contrib/v3/websocket</code> (<code>internal/ws</code>). 연결 하나 = 읽기 + 쓰기 고루틴, 허브(<code>internal/hub</code>)의 <code>chan []byte</code> 우편함 하나.', '핸들러는 <code>Publisher</code> 인터페이스로 허브를 받아요 (message, notification). 테스트에선 가짜를 넣어요.', '앱: <code>github.com/coder/websocket</code> (<code>desktop/internal/client/events.go</code>, <code>bridge/realtime.go</code>) → Wails 이벤트 <code>rt</code>.'] },
 ];
 
 /* 실시간 이벤트 (서버 → 앱) */
 const EVENTS = [
-  ['hello', 'MVP 1', '연결 직후 한 번', { protocol: 1, server_time: '…', account_id: 1 }],
-  ['message.created', 'MVP 1', '새 메시지 (sys 포함). 내가 보낸 것도 와요 → client_id 로 내 임시 메시지와 합쳐요', { room_id: 3, message: MSG }],
-  ['message.updated', 'MVP 3', '돌림판 다시 돌리기, 투표 수 변경', { room_id: 3, message: '…' }],
-  ['message.deleted', 'MVP 2', '지운 메시지', { room_id: 3, message_id: 812, seq: 128 }],
-  ['reaction.updated', 'MVP 2', '그 메시지 맞장구 최종 개수', { room_id: 3, message_id: 812, reactions: [{ react_id: 1, count: 3, me: true }] }],
-  ['shake', 'MVP 1', '<b>나를</b> 흔들었을 때만 (방해 금지면 안 옴). 앱이 창을 흔들어요', { azit_id: 1, room_id: 3, from: 2, from_nick: '강백호', message_id: 813 }],
-  ['room.created', 'MVP 1', '새 방', { azit_id: 1, room: ROOM }],
-  ['room.updated', 'MVP 2', '이름 바꿈·보관·꺼냄', { azit_id: 1, room: ROOM }],
-  ['room.read', 'MVP 1', '내 다른 기기에서 읽음', { room_id: 3, seq: 128 }],
-  ['azit.updated', 'MVP 2', '기본 정보 바뀜', { azit: '아지트 자세히(멤버 제외)' }],
-  ['azit.removed', 'MVP 2', '내가 내보내졌거나 나감 → 레일에서 빼요', { azit_id: 1, reason: 'kicked' }],
-  ['member.joined', 'MVP 1', '새 멤버', { azit_id: 1, member: MEMBER }],
-  ['member.updated', 'MVP 2', '닉네임·색·칭호', { azit_id: 1, member: MEMBER }],
-  ['member.left', 'MVP 2', '나감·내보내짐', { azit_id: 1, account_id: 9, reason: 'left' }],
-  ['presence', 'MVP 1', '접속·방해 금지 바뀜 (같은 아지트 사람에게만)', { account_id: 2, online: true, dnd: false }],
-  ['notification.created', 'MVP 2', '새 알림 → 종 배지', { notification: '알림 목록의 한 항목' }],
-  ['stickers.updated', 'MVP 2', '짤 추가·빼기·이름', { azit_id: 1 }],
-  ['reacts.updated', 'MVP 2', '맞장구 목록 바뀜', { azit_id: 1, reacts: '…' }],
-  ['game.updated', 'MVP 3', '라이어 판 상태. 받는 사람 시점으로 각자 다르게 만들어 보내요', { game: '라이어 판 상태(내 시점)' }],
-  ['session.revoked', 'MVP 1', '계정 멈춤·로그아웃 → 앱은 로그인 화면으로', { reason: 'account_disabled' }],
-  ['update.required', 'MVP 1', '앱 프로토콜이 너무 옛날', { min_protocol: 2 }],
+  ['message.created', 'MVP 1', '새 메시지 (글자·사진·짤). 내가 보낸 것도 와요 → temp_id 로 내 "보내는 중" 메시지와 합쳐요. 받는 사람: 그 아지트 지금 멤버 전원', MSG],
+  ['message.updated', 'MVP 1', '고침·지움·맞장구 달기/떼기. 내용 대신 위치만 와요 (맞장구 mine 이 사람마다 달라서) → 앱이 그 방 메시지를 HTTP 로 다시 받아요', { azit_id: 1, room_id: 3, message_id: 812 }],
+  ['notification.created', 'MVP 2', '새 알림 (흔들기·입장·내보내기) → 종 배지, kind 가 shake 면 창 흔들기. 받는 사람 한 명에게만', { notification_id: 41, kind: 'shake', azit_id: 1, azit_name: '의성', room_id: 3, room_name: '다같이', message_id: 812, actor_id: 2, actor_nickname: '강백호', preview: '@4n5rud 점심', read: false, created_at: '2026-10-19T05:10:00Z' }],
+  ['azit.changed', 'MVP 2', '아지트에서 무엇이 바뀜 → 앱이 그 목록을 HTTP 로 다시 받아요. <code>what</code>: rooms(방 만들기·이름·순서·지우기), info(이름·색·소개·배너), members(들어옴·나감·내보냄·역할·닉네임·풀기), memes(짤), reacts(맞장구 목록). 받는 사람: 그 아지트 지금 멤버 전원 (내보낸 사람에게도 한 번)', { azit_id: 1, what: 'rooms' }],
+  ['presence', 'MVP 1', '같은 아지트 사람이 앱을 켬/끔 (첫 연결·마지막 연결 끊김). 받는 사람: 나와 아지트를 하나라도 같이 쓰는 사람', { account_id: 2, online: true }],
+  ['game.updated', 'MVP 3', '(아직 없음) 라이어 판 상태', { game: '…' }],
 ];
 
 /* 에러 코드 전체 (공통) */
