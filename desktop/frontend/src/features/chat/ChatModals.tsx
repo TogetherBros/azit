@@ -1,4 +1,5 @@
 // + 메뉴와 메시지 메뉴에서 뜨는 모달들: 돌림판, 투표, 사진 크게 보기, 메시지 지우기
+import { useEffect } from 'react'
 import { Icon } from '../../components/Icon'
 import { Modal } from '../../components/Modal'
 
@@ -66,11 +67,19 @@ export function PollModal({ question = '', options }: PollProps) {
   )
 }
 
+// 사진 크게 보기: 틀 없이 사진만 화면 가운데에. 창보다 크면 줄이고, 스크롤은 없다. 아무 데나 누르거나 Esc 로 닫는다.
 export function ImageModal({ src, onClose }: { src: string; onClose?: () => void }) {
+  useEffect(() => {
+    if (!onClose) return
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [onClose])
+
   return (
-    <Modal title="사진" onClose={onClose}>
-      <img src={src} alt="사진" style={{ borderRadius: 16 }} />
-    </Modal>
+    <div className="lightbox" role="dialog" aria-label="사진 크게 보기" onClick={onClose}>
+      <img src={src} alt="사진" />
+    </div>
   )
 }
 
