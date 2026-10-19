@@ -5,7 +5,8 @@
 *.db-shm
 .env
 node_modules/
-desktop/frontend/dist/
+desktop/frontend/dist/*
+!desktop/frontend/dist/.gitkeep
 desktop/build/bin/
 .idea/workspace.xml
 .idea/shelf/

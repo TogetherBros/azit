@@ -23,6 +23,16 @@ type AuthService struct {
 	tokens proto.TokenResponse
 
 	refreshMu sync.Mutex // 갱신은 한 번에 하나만
+
+	onChange func() // 로그인·로그아웃 뒤에 부른다 (실시간 연결을 새 계정으로 다시 붙이려고)
+}
+
+// changed 는 로그인·로그아웃 뒤에 부른다. onChange 는 NewRealtime 이 꽂는다.
+// (AuthService 의 공개 메서드는 React 바인딩이 되니까, 설정용 메서드를 따로 두지 않는다)
+func (s *AuthService) changed() {
+	if s.onChange != nil {
+		s.onChange()
+	}
 }
 
 func NewAuthService(api *client.Client, clientID string) *AuthService {
@@ -49,6 +59,7 @@ func (s *AuthService) Login(ctx context.Context) error {
 	s.mu.Lock()
 	s.tokens = tokens
 	s.mu.Unlock()
+	s.changed()
 	return nil
 }
 
@@ -66,6 +77,7 @@ func (s *AuthService) Logout(ctx context.Context) {
 	rt := s.tokens.RefreshToken
 	s.tokens = proto.TokenResponse{}
 	s.mu.Unlock()
+	s.changed() // 실시간 연결도 끊는다 (나간 계정의 이벤트가 계속 오지 않게)
 
 	if rt == "" {
 		return
