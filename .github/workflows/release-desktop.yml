@@ -73,16 +73,18 @@ jobs:
           rm -f version.go.bak build/config.yml.bak
           grep -n appVersion version.go
 
-      - name: wails3 설치 (go.mod 의 Wails 버전과 맞춤)
-        run: |
-          WAILS_VERSION=$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)
-          go install "github.com/wailsapp/wails/v3/cmd/wails3@$WAILS_VERSION"
-
+      # wails3 CLI 자체도 리눅스에선 GTK 헤더가 있어야 컴파일돼서, wails3 설치보다 먼저 깐다.
       - name: Linux 빌드 도구
         if: matrix.target == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libfuse2t64
+          # Wails v3 는 리눅스에서 GTK4 + WebKitGTK 6.0 을 쓴다
+          sudo apt-get install -y build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev libfuse2t64
+
+      - name: wails3 설치 (go.mod 의 Wails 버전과 맞춤)
+        run: |
+          WAILS_VERSION=$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)
+          go install "github.com/wailsapp/wails/v3/cmd/wails3@$WAILS_VERSION"
 
       - name: Windows 설치 파일 도구 (NSIS)
         if: matrix.target == 'windows'
