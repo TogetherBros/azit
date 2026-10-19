@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 
 	"log"
@@ -14,12 +15,13 @@ import (
 var assets embed.FS
 
 const (
-	serverURL      = "http://127.0.0.1:8081"
 	googleClientID = "1089773756666-p61lrvmkpkkrfb5ofpu3pglv7fb8607n.apps.googleusercontent.com"
 )
 
 func init() {
 	application.RegisterEvent[string]("time")
+	application.RegisterEvent[string](bridge.EventRealtime) // 서버 이벤트 JSON 그대로
+	application.RegisterEvent[string](bridge.EventRTOpen)   // 실시간 연결됨 (data 없음)
 }
 
 func main() {
@@ -27,6 +29,8 @@ func main() {
 	auth := bridge.NewAuthService(api, googleClientID)
 	profile := bridge.NewProfileService(api, auth)
 	apiService := bridge.NewAPIService(api, auth)
+	updates := bridge.NewUpdateService(appVersion, updateURL) // 새 버전 알림 (serverURL, updateURL 은 server_dev.go / server_prod.go)
+	realtime := bridge.NewRealtime(api, auth) // 서버 실시간 연결 (React 는 rt 이벤트만 듣는다)
 
 	app := application.New(application.Options{
 		Name:        "azit",
@@ -36,6 +40,7 @@ func main() {
 			application.NewService(auth),
 			application.NewService(profile),
 			application.NewService(apiService),
+			application.NewService(updates),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -63,6 +68,11 @@ func main() {
 			time.Sleep(time.Second)
 		}
 	}()
+
+	// 앱이 켜져 있는 내내 실시간 연결을 유지한다 (로그인 전이면 기다린다). 앱이 끝나면 같이 끝난다.
+	rtCtx, stopRT := context.WithCancel(context.Background())
+	defer stopRT()
+	go realtime.Run(rtCtx)
 
 	err := app.Run()
 
