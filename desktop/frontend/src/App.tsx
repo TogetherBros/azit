@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { isCancelled, isLoggedIn, loginErrorText, logout, startLogin, type LoginTask } from './api/auth'
+import { UpdatePrompt } from './app/UpdatePrompt'
 import { WindowFrame } from './app/WindowFrame'
 import { MeScreen } from './features/me/MeScreen'
 import { LoginScreen } from './features/auth/LoginScreen'
@@ -54,6 +55,7 @@ export default function App() {
 
   return (
     <WindowFrame>
+      <UpdatePrompt />
       {phase === 'in' ? (
         <MeScreen onLogout={leave} />
       ) : (
