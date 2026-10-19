@@ -1,9 +1,8 @@
 package message
 
 import (
+	"context"
 	"errors"
-	"time"
-
 	"github.com/TogetherBros/azit/proto"
 	"github.com/TogetherBros/azit/server/internal/account"
 	"github.com/TogetherBros/azit/server/internal/httperr"
@@ -13,6 +12,8 @@ import (
 	"github.com/TogetherBros/azit/server/internal/room"
 	"github.com/TogetherBros/azit/server/internal/storage"
 	"github.com/gofiber/fiber/v3"
+	"log"
+	"time"
 )
 
 // 목록 한 번에 가져오는 개수. limit 을 안 주면 DefaultLimit, 너무 크면 MaxLimit 으로 줄인다.
@@ -21,6 +22,9 @@ const (
 	MaxLimit     = 100
 )
 
+type Publisher interface {
+	Publish(accountIDs []int64, ev any) error
+}
 type Handler struct {
 	repo        *Repository
 	roomRepo    *room.Repository    // 방이 이 아지트 것인지 확인
@@ -28,10 +32,11 @@ type Handler struct {
 	accountRepo *account.Repository // 보낸 사람 색, 사진
 	memeRepo    *meme.Repository    // 짤 맞장구 확인, 짤 보기 링크
 	r2          *storage.R2         // 사진 키 → 보기 주소
+	pub         Publisher
 }
 
-func NewHandler(repo *Repository, roomRepo *room.Repository, memberRepo *member.Repository, accountRepo *account.Repository, memeRepo *meme.Repository, r2 *storage.R2) *Handler {
-	return &Handler{repo: repo, roomRepo: roomRepo, memberRepo: memberRepo, accountRepo: accountRepo, memeRepo: memeRepo, r2: r2}
+func NewHandler(repo *Repository, roomRepo *room.Repository, memberRepo *member.Repository, accountRepo *account.Repository, memeRepo *meme.Repository, r2 *storage.R2, pub Publisher) *Handler {
+	return &Handler{repo: repo, roomRepo: roomRepo, memberRepo: memberRepo, accountRepo: accountRepo, memeRepo: memeRepo, r2: r2, pub: pub}
 }
 
 // Routes 는 /v1/azits 그룹 아래에 메시지 경로를 단다. room.Handler.Routes 와 같은 방식.
@@ -140,7 +145,42 @@ func (h *Handler) SendMessage(c fiber.Ctx) error {
 		return err
 	}
 
-	return h.respondOne(c, fiber.StatusCreated, me, m)
+	res, err := h.toResponses(ctx, me, []Message{m})
+	if err != nil {
+		return err
+	}
+
+	h.publish(ctx, me.AzitID, proto.Event{Type: proto.EventMessageCreated, Data: res[0]})
+
+	// 10. 흔들린 사람에게는 "알림이 왔다"를 본인에게만 따로 보낸다 (종 숫자 올리기, 창 흔들기).
+	//     notes 는 repo.Create 가 저장하면서 id·이름·시각을 채워 둔 상태다.
+	notification.Publish(h.pub, notes)
+
+	return c.Status(fiber.StatusCreated).JSON(res[0])
+}
+
+// publishUpdated 는 "이 메시지가 바뀌었다"(고침·지움·맞장구)를 알린다. 내용 대신 위치만 보낸다.
+// 앱은 이걸 받으면 그 방 메시지를 HTTP 로 다시 받아서 자기 기준(mine 등)으로 다시 그린다.
+func (h *Handler) publishUpdated(ctx context.Context, m Message) {
+	h.publish(ctx, m.AzitID, proto.Event{
+		Type: proto.EventMessageUpdated,
+		Data: proto.MessageRef{AzitID: m.AzitID, RoomID: m.RoomID, MessageID: m.MessageID},
+	})
+}
+
+func (h *Handler) publish(ctx context.Context, azitID int64, ev proto.Event) {
+	members, err := h.memberRepo.ListActive(ctx, azitID)
+	if err != nil {
+		log.Printf("실시간 배달 실패 (멤버 조회): %v", err)
+		return
+	}
+	ids := make([]int64, 0, len(members))
+	for _, m := range members {
+		ids = append(ids, m.AccountID)
+	}
+	if err := h.pub.Publish(ids, ev); err != nil {
+		log.Printf("실시간 배달 실패: %v", err)
+	}
 }
 
 // shakeNotes 는 흔들린 사람마다 알림 한 줄씩 만든다. @전체 면 나 빼고 지금 멤버 전부, 아니면 @로 부른 사람들 (나는 빼고).
@@ -330,6 +370,7 @@ func (h *Handler) UpdateMessage(c fiber.Ctx) error {
 		}
 		m.Body = req.Body
 		m.EditedAt = &now
+		h.publishUpdated(ctx, m) // 바뀐 게 있을 때만
 	}
 
 	return h.respondOne(c, fiber.StatusOK, me, m)
@@ -354,6 +395,7 @@ func (h *Handler) DeleteMessage(c fiber.Ctx) error {
 	if err := h.repo.SoftDelete(c.Context(), m.MessageID, time.Now()); err != nil {
 		return err
 	}
+	h.publishUpdated(c.Context(), m)
 	return c.SendStatus(fiber.StatusNoContent)
 }
 

@@ -18,6 +18,12 @@ type CreateMemeRequest struct {
 	Key  string `json:"key"`  // 업로드로 받은 R2 키 (memes/{내 id}/...)
 }
 
+// SaveMemeFromMessageRequest 는 POST /v1/azits/{id}/memes/from-message 의 요청이다. 채팅에 올라온 사진을 짤로 저장한다.
+type SaveMemeFromMessageRequest struct {
+	MessageID int64  `json:"message_id"` // 사진(또는 짤) 메시지
+	Name      string `json:"name"`       // 1~20자
+}
+
 // ReactItem 은 아지트 맞장구 목록의 한 칸. 글자(Text) 또는 짤(MemeID) 중 하나만 채운다.
 type ReactItem struct {
 	Text   string `json:"text"`    // 1~4자. 짤이면 ""

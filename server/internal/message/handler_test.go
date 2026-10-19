@@ -25,8 +25,24 @@ import (
 )
 
 // sendEnv 는 메시지 보내기 테스트용 서버. 아지트 1 에 멤버 한 명, 방 하나, 짤 하나가 있다.
+// fakePublisher 는 진짜 허브 대신 넣는 가짜. 받은 이벤트를 적어 두기만 한다.
+type fakePublisher struct {
+	sent []published
+}
+
+type published struct {
+	to []int64
+	ev any
+}
+
+func (f *fakePublisher) Publish(accountIDs []int64, ev any) error {
+	f.sent = append(f.sent, published{to: accountIDs, ev: ev})
+	return nil
+}
+
 type sendEnv struct {
 	db       *gorm.DB
+	pub      *fakePublisher // 핸들러가 허브로 보낸 이벤트들
 	app      *fiber.App
 	token    string
 	roomID   int64
@@ -75,7 +91,8 @@ func newSendEnv(t *testing.T) sendEnv {
 	must(t, err)
 
 	memberRepo := member.NewRepository(conn)
-	h := NewHandler(NewRepository(conn), roomRepo, memberRepo, account.NewRepository(conn), meme.NewRepository(conn), r2)
+	pub := &fakePublisher{}
+	h := NewHandler(NewRepository(conn), roomRepo, memberRepo, account.NewRepository(conn), meme.NewRepository(conn), r2, pub)
 
 	p := auth.NewTokenProvider("test-secret", time.Minute, time.Hour)
 	token, err := p.IssueAccessToken(acc.ID)
@@ -84,7 +101,7 @@ func newSendEnv(t *testing.T) sendEnv {
 	app := fiber.New(fiber.Config{ErrorHandler: httperr.Handler}) // 실제 서버처럼 httperr 를 상태 코드로
 	h.Routes(app.Group("/v1/azits", auth.RequireAuth(p)), member.RequireMember(memberRepo))
 
-	return sendEnv{db: conn, app: app, token: token, roomID: rm.RoomID, memeID: mine.MemeID, other: other.MemeID, friend: friend.ID, outsider: outsider.ID}
+	return sendEnv{db: conn, pub: pub, app: app, token: token, roomID: rm.RoomID, memeID: mine.MemeID, other: other.MemeID, friend: friend.ID, outsider: outsider.ID}
 }
 
 func must(t *testing.T, err error) {
@@ -230,5 +247,121 @@ func TestSendMessage_ShakeNotifications(t *testing.T) {
 	e.db.Where("account_id = ?", e.friend).First(&n)
 	if n.Kind != notification.KindShake || n.RoomName != "아지트" || n.Preview != "@백호 점심" || n.ActorNick != "문경" {
 		t.Errorf("알림 = %+v", n)
+	}
+}
+
+// 메시지를 보내면 저장 뒤 message.created 가 아지트 지금 멤버 전원(나 포함)에게 한 번 나간다.
+// 같은 번호표로 다시 보내면(재전송) 또 나가지 않는다.
+func TestSendMessage_PublishesCreated(t *testing.T) {
+	e := newSendEnv(t)
+
+	status, m := e.send(t, proto.SendMessageRequest{TempID: "p-1", Body: "점심 누가 쏨"})
+	if status != 201 {
+		t.Fatalf("status = %d", status)
+	}
+	if len(e.pub.sent) != 1 {
+		t.Fatalf("나간 이벤트 수 = %d, want 1", len(e.pub.sent))
+	}
+	got := e.pub.sent[0]
+
+	ev, ok := got.ev.(proto.Event)
+	if !ok || ev.Type != proto.EventMessageCreated {
+		t.Fatalf("이벤트 = %#v, want message.created", got.ev)
+	}
+	if data, ok := ev.Data.(proto.MessageResponse); !ok || data.MessageID != m.MessageID {
+		t.Errorf("data = %#v, want 방금 보낸 메시지 %d", ev.Data, m.MessageID)
+	}
+
+	to := map[int64]bool{}
+	for _, id := range got.to {
+		to[id] = true
+	}
+	if !to[e.friend] || to[e.outsider] || len(got.to) != 2 {
+		t.Errorf("받는 사람 = %v, want 나 + 백호 (다른 아지트 사람 빼고)", got.to)
+	}
+
+	// 재전송: 같은 번호표 → 새로 안 만들고, 이벤트도 안 나간다
+	if status, _ := e.send(t, proto.SendMessageRequest{TempID: "p-1", Body: "점심 누가 쏨"}); status != 201 {
+		t.Fatalf("재전송 status = %d", status)
+	}
+	if len(e.pub.sent) != 1 {
+		t.Errorf("재전송 뒤 이벤트 수 = %d, want 1 그대로", len(e.pub.sent))
+	}
+}
+
+// 고치기·지우기·맞장구는 message.updated 로 "어느 메시지가 바뀌었는지"만 알린다.
+func TestUpdates_PublishMessageRef(t *testing.T) {
+	e := newSendEnv(t)
+	_, m := e.send(t, proto.SendMessageRequest{TempID: "u-1", Body: "처음"})
+	e.pub.sent = nil // 보내기 이벤트는 빼고 본다
+
+	do := func(method, path, body string) int {
+		r := httptest.NewRequest(method, path, bytes.NewBufferString(body))
+		r.Header.Set("Authorization", "Bearer "+e.token)
+		r.Header.Set("Content-Type", "application/json")
+		res, err := e.app.Test(r)
+		must(t, err)
+		return res.StatusCode
+	}
+	base := fmt.Sprintf("/v1/azits/1/messages/%d", m.MessageID)
+
+	steps := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{"고치기", "PATCH", base, `{"body":"고침"}`},
+		{"짤 맞장구 달기", "PUT", base + "/reactions", fmt.Sprintf(`{"meme_id":%d}`, e.memeID)},
+		{"짤 맞장구 떼기", "DELETE", base + "/reactions", fmt.Sprintf(`{"meme_id":%d}`, e.memeID)},
+		{"지우기", "DELETE", base, ""},
+	}
+	for i, s := range steps {
+		if status := do(s.method, s.path, s.body); status >= 300 {
+			t.Fatalf("%s: status %d", s.name, status)
+		}
+		if len(e.pub.sent) != i+1 {
+			t.Fatalf("%s 뒤 이벤트 수 = %d, want %d", s.name, len(e.pub.sent), i+1)
+		}
+		ev := e.pub.sent[i].ev.(proto.Event)
+		ref, ok := ev.Data.(proto.MessageRef)
+		if ev.Type != proto.EventMessageUpdated || !ok || ref.MessageID != m.MessageID || ref.RoomID != e.roomID {
+			t.Errorf("%s: 이벤트 = %#v", s.name, ev)
+		}
+	}
+
+	// 같은 내용으로 고치면 바뀐 게 없으니 안 나간다
+	before := len(e.pub.sent)
+	_, m2 := e.send(t, proto.SendMessageRequest{TempID: "u-2", Body: "그대로"})
+	e.pub.sent = e.pub.sent[:before]
+	if status := do("PATCH", fmt.Sprintf("/v1/azits/1/messages/%d", m2.MessageID), `{"body":"그대로"}`); status != 200 {
+		t.Fatalf("같은 내용 고치기 status %d", status)
+	}
+	if len(e.pub.sent) != before {
+		t.Errorf("바뀐 게 없는데 이벤트가 나감")
+	}
+}
+
+// @로 부르면 message.created(아지트 전원)와 별개로, 불린 사람에게만 notification.created 가 간다.
+func TestSendMessage_PublishesShakeNotification(t *testing.T) {
+	e := newSendEnv(t)
+
+	_, m := e.send(t, proto.SendMessageRequest{TempID: "n-p", Body: "@백호 점심", ShakeIDs: []int64{e.friend}})
+
+	var notes []published
+	for _, p := range e.pub.sent {
+		if ev := p.ev.(proto.Event); ev.Type == proto.EventNotificationCreated {
+			notes = append(notes, p)
+		}
+	}
+	if len(notes) != 1 {
+		t.Fatalf("알림 이벤트 수 = %d, want 1", len(notes))
+	}
+	if len(notes[0].to) != 1 || notes[0].to[0] != e.friend {
+		t.Errorf("받는 사람 = %v, want 백호만", notes[0].to)
+	}
+	n, ok := notes[0].ev.(proto.Event).Data.(proto.NotificationResponse)
+	if !ok || n.NotificationID == 0 || n.Kind != "shake" || n.MessageID != m.MessageID || n.RoomName != "아지트" || n.ActorNickname != "문경" {
+		t.Errorf("알림 = %#v (저장된 id·이름이 채워져 있어야 함)", n)
 	}
 }

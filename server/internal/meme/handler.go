@@ -3,28 +3,41 @@ package meme
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 
 	"github.com/TogetherBros/azit/proto"
+	"github.com/TogetherBros/azit/server/internal/changelog"
 	"github.com/TogetherBros/azit/server/internal/httperr"
+	"github.com/TogetherBros/azit/server/internal/live"
 	"github.com/TogetherBros/azit/server/internal/member"
 	"github.com/TogetherBros/azit/server/internal/storage"
 	"github.com/gofiber/fiber/v3"
 )
 
-type Handler struct {
-	repo *Repository
-	r2   *storage.R2
+// PhotoSource 는 채팅에 올라온 사진을 찾는 쪽 (message.Repository).
+// meme 이 message 를 import 하면 순환 import 라서 (message 가 이미 meme 을 쓴다) 인터페이스로 받는다.
+type PhotoSource interface {
+	PhotoKey(ctx context.Context, azitID, messageID int64) (string, error)
 }
 
-func NewHandler(repo *Repository, r2 *storage.R2) *Handler {
-	return &Handler{repo: repo, r2: r2}
+type Handler struct {
+	repo   *Repository
+	r2     *storage.R2
+	photos PhotoSource           // 채팅 사진 → 짤로 저장
+	live   *live.Live            // 짤·맞장구 목록이 바뀌면 멤버들에게 알림 (nil 이면 안 보냄)
+	logs   *changelog.Repository // 변경 기록 (nil 이면 안 남김)
+}
+
+func NewHandler(repo *Repository, r2 *storage.R2, photos PhotoSource, lv *live.Live, logs *changelog.Repository) *Handler {
+	return &Handler{repo: repo, r2: r2, photos: photos, live: lv, logs: logs}
 }
 
 // Routes 는 /v1/azits 그룹 아래에 짤, 맞장구 목록 경로를 단다.
 func (h *Handler) Routes(r fiber.Router, requireMember fiber.Handler) {
 	r.Get("/:id/memes", requireMember, h.ListMemes)
 	r.Post("/:id/memes", requireMember, h.CreateMeme)
+	r.Post("/:id/memes/from-message", requireMember, h.SaveFromMessage)
 	r.Delete("/:id/memes/:memeId", requireMember, h.DeleteMeme)
 	r.Get("/:id/reacts", requireMember, h.ListReacts)
 	r.Put("/:id/reacts", requireMember, h.ReplaceReacts)
@@ -77,21 +90,64 @@ func (h *Handler) CreateMeme(c fiber.Ctx) error {
 		return err
 	}
 
+	return h.create(c, me, name, req.Key)
+}
+
+// create 는 짤 한 줄을 넣고 기록·알림을 남긴 뒤 응답한다. 올리기와 "채팅 사진을 짤로" 가 같이 쓴다.
+func (h *Handler) create(c fiber.Ctx, me member.Member, name, key string) error {
 	m := Meme{
 		AzitID:    me.AzitID,
 		Name:      name,
-		MediaKey:  req.Key,
+		MediaKey:  key,
 		CreatedBy: me.AccountID,
 	}
 	if err := h.repo.Create(c.Context(), &m); err != nil {
 		return err
 	}
+	h.logs.Record(c.Context(), changelog.Entry{
+		AzitID: me.AzitID, ActorID: me.AccountID, ActorNick: me.NickName,
+		Kind: changelog.KindMemeCreate, TargetID: m.MemeID, Summary: fmt.Sprintf("'%s' 짤을 올림", m.Name),
+	}, nil)
+	h.live.AzitChanged(c.Context(), me.AzitID, proto.ChangedMemes)
 
 	res, err := h.memeResponse(c.Context(), m)
 	if err != nil {
 		return err
 	}
 	return c.Status(fiber.StatusCreated).JSON(res)
+}
+
+// SaveFromMessage 는 채팅에 올라온 사진을 아지트 짤 모음에 넣는다. 멤버면 누구나.
+// POST /v1/azits/{id}/memes/from-message {"message_id": 812, "name": "킹받네"}
+// 사진 파일은 보낸 사람 폴더에 있어서, 내 짤 폴더(memes/{내 id}/)로 복사해 둔다 (사진 메시지가 지워져도 짤은 남게).
+func (h *Handler) SaveFromMessage(c fiber.Ctx) error {
+	me := member.Current(c)
+
+	var req proto.SaveMemeFromMessageRequest
+	if err := c.Bind().JSON(&req); err != nil {
+		return fiber.ErrBadRequest
+	}
+	name := NormalizeName(req.Name)
+	if err := ValidateName(name); err != nil {
+		return badRequest(err)
+	}
+
+	src, err := h.photos.PhotoKey(c.Context(), me.AzitID, req.MessageID)
+	if err != nil {
+		return badRequest(err)
+	}
+	size, contentType, err := h.r2.Head(c.Context(), src)
+	if err != nil {
+		return err
+	}
+	dst, err := storage.NewKey(storage.KindMeme, me.AccountID, contentType, size)
+	if err != nil {
+		return badRequest(err)
+	}
+	if err := h.r2.Copy(c.Context(), src, dst); err != nil {
+		return err
+	}
+	return h.create(c, me, name, dst)
 }
 
 // DeleteMeme 은 짤을 지운다. 올린 사람이나 관리자 이상만. DELETE /v1/azits/{id}/memes/{memeId}
@@ -115,6 +171,12 @@ func (h *Handler) DeleteMeme(c fiber.Ctx) error {
 	if err := h.repo.SoftDelete(c.Context(), memeID); err != nil {
 		return err
 	}
+	h.logs.Record(c.Context(), changelog.Entry{
+		AzitID: me.AzitID, ActorID: me.AccountID, ActorNick: me.NickName,
+		Kind: changelog.KindMemeDelete, TargetID: memeID, Summary: fmt.Sprintf("'%s' 짤을 뺌", m.Name),
+	}, nil)
+	h.live.AzitChanged(c.Context(), me.AzitID, proto.ChangedMemes)
+	h.live.AzitChanged(c.Context(), me.AzitID, proto.ChangedReacts) // 맞장구 목록에서도 빠졌다
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
@@ -179,9 +241,26 @@ func (h *Handler) ReplaceReacts(c fiber.Ctx) error {
 		}
 	}
 
+	before, err := h.repo.ListReacts(c.Context(), me.AzitID) // 되돌리기용 옛 목록
+	if err != nil {
+		return err
+	}
 	if err := h.repo.ReplaceReacts(c.Context(), me.AzitID, reacts); err != nil {
 		return err
 	}
+	old := make([]proto.ReactItem, 0, len(before))
+	for _, r := range before {
+		item := proto.ReactItem{Text: r.Text}
+		if r.MemeID != nil {
+			item.MemeID = *r.MemeID
+		}
+		old = append(old, item)
+	}
+	h.logs.Record(c.Context(), changelog.Entry{
+		AzitID: me.AzitID, ActorID: me.AccountID, ActorNick: me.NickName,
+		Kind: changelog.KindReacts, Summary: "맞장구 목록을 바꿈",
+	}, old)
+	h.live.AzitChanged(c.Context(), me.AzitID, proto.ChangedReacts)
 	return h.writeReacts(c, me.AzitID)
 }
 

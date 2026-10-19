@@ -14,6 +14,7 @@ var (
 	ErrNotFound      = errors.New("없는 초대 코드예요")
 	ErrUnusable      = errors.New("만료됐거나 더 쓸 수 없는 초대 코드예요")
 	ErrAlreadyMember = errors.New("이미 들어와 있는 아지트예요")
+	ErrBanned        = errors.New("이 아지트에는 들어갈 수 없어요")
 )
 
 // createTries 는 코드가 겹쳤을 때 다시 만들어 보는 횟수. 32^8 이라 실제로 겹칠 일은 거의 없다.
@@ -85,13 +86,14 @@ func (r *Repository) Revoke(ctx context.Context, inviteID int64, now time.Time) 
 }
 
 // notifyJoin 은 원래 있던 멤버들(들어온 사람 빼고)에게 "누가 들어왔어요" 알림을 남긴다. Join 트랜잭션 안에서 부른다.
-func notifyJoin(tx *gorm.DB, azitID, joinerID int64, nickname string) error {
+// 저장된 알림들을 돌려준다 (커밋 뒤 실시간으로 보내려고).
+func notifyJoin(tx *gorm.DB, azitID, joinerID int64, nickname string) ([]notification.Notification, error) {
 	var ids []int64
 	err := tx.Model(&member.Member{}).
 		Where("azit_id = ? AND left_at IS NULL AND account_id <> ?", azitID, joinerID).
 		Pluck("account_id", &ids).Error
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	notes := make([]notification.Notification, 0, len(ids))
@@ -104,7 +106,10 @@ func notifyJoin(tx *gorm.DB, azitID, joinerID int64, nickname string) error {
 			ActorNick: nickname,
 		})
 	}
-	return notification.Insert(tx, notes)
+	if err := notification.Insert(tx, notes); err != nil {
+		return nil, err
+	}
+	return notes, nil
 }
 
 // JoinInput 은 초대 코드로 들어올 때 필요한 값.
@@ -117,9 +122,10 @@ type JoinInput struct {
 
 // Join 은 초대 코드로 아지트에 들어간다. 한 트랜잭션 안에서
 // 1) 코드 확인 2) 이미 멤버인지 확인 3) 사용 횟수 +1 (조건부) 4) 멤버 줄 만들기/살리기 를 한다.
-// 돌려주는 값은 들어간 아지트의 ID.
-func (r *Repository) Join(ctx context.Context, in JoinInput) (int64, error) {
+// 돌려주는 값은 들어간 아지트의 ID 와, 원래 멤버들에게 남긴 입장 알림들 (커밋 뒤 실시간으로 보내려고).
+func (r *Repository) Join(ctx context.Context, in JoinInput) (int64, []notification.Notification, error) {
 	var azitID int64
+	var notes []notification.Notification
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var inv Invite
@@ -145,6 +151,15 @@ func (r *Repository) Join(ctx context.Context, in JoinInput) (int64, error) {
 
 		if !inv.Usable(in.Now) {
 			return ErrUnusable
+		}
+
+		// 막힌 사람은 새 코드로도 못 들어온다.
+		banned, err := member.IsBanned(tx, inv.AzitID, in.AccountID)
+		if err != nil {
+			return err
+		}
+		if banned {
+			return ErrBanned
 		}
 
 		// 여러 명이 동시에 들어와도 MaxUses 를 넘지 않게, 조건을 건 UPDATE 한 번으로 올린다.
@@ -182,8 +197,9 @@ func (r *Repository) Join(ctx context.Context, in JoinInput) (int64, error) {
 			return err
 		}
 
-		return notifyJoin(tx, inv.AzitID, in.AccountID, in.Nickname)
+		notes, err = notifyJoin(tx, inv.AzitID, in.AccountID, in.Nickname)
+		return err
 	})
 
-	return azitID, err
+	return azitID, notes, err
 }

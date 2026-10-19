@@ -9,8 +9,10 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("방을 찾을 수 없어요")
-	ErrBadOrder = errors.New("방 순서가 맞지 않아요. 목록을 새로 받아 주세요")
+	ErrNotFound    = errors.New("방을 찾을 수 없어요")
+	ErrBadOrder    = errors.New("방 순서가 맞지 않아요. 목록을 새로 받아 주세요")
+	ErrLastRoom    = errors.New("마지막 남은 방은 지울 수 없어요")
+	ErrDefaultRoom = errors.New("기본 방은 지울 수 없어요")
 )
 
 type Repository struct {
@@ -97,4 +99,62 @@ func (r *Repository) Reorder(ctx context.Context, azitID int64, roomIDs []int64)
 		}
 		return nil
 	})
+}
+
+// DefaultID 는 아지트의 기본 방 id. 아지트를 만들 때 같이 생긴 첫 방이라 가장 작은 id 다.
+func (r *Repository) DefaultID(ctx context.Context, azitID int64) (int64, error) {
+	return defaultID(r.db.WithContext(ctx), azitID)
+}
+
+func defaultID(db *gorm.DB, azitID int64) (int64, error) {
+	var id int64
+	err := db.Unscoped().Model(&Room{}).Where("azit_id = ?", azitID).Select("COALESCE(MIN(room_id), 0)").Scan(&id).Error
+	return id, err
+}
+
+// Delete 는 방을 지운다 (숨김). 기본 방이면 ErrDefaultRoom, 아지트에 방이 하나만 남았으면 ErrLastRoom.
+// 지운 방은 목록·FindByID 에서 빠지고, 그 방 메시지는 DB 에 남는다 (Restore 로 다시 살릴 수 있게).
+func (r *Repository) Delete(ctx context.Context, azitID, roomID int64) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		def, err := defaultID(tx, azitID)
+		if err != nil {
+			return err
+		}
+		if roomID == def {
+			return ErrDefaultRoom
+		}
+		var n int64
+		if err := tx.Model(&Room{}).Where("azit_id = ?", azitID).Count(&n).Error; err != nil {
+			return err
+		}
+		if n <= 1 {
+			return ErrLastRoom
+		}
+		res := tx.Where("azit_id = ?", azitID).Delete(&Room{}, roomID)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return ErrNotFound
+		}
+		return nil
+	})
+}
+
+// Restore 는 지운 방을 다시 살린다. 자리는 맨 아래로.
+func (r *Repository) Restore(ctx context.Context, azitID, roomID int64) error {
+	position, err := r.nextPosition(ctx, azitID)
+	if err != nil {
+		return err
+	}
+	res := r.db.WithContext(ctx).Unscoped().Model(&Room{}).
+		Where("room_id = ? AND azit_id = ? AND deleted_at IS NOT NULL", roomID, azitID).
+		Updates(map[string]any{"deleted_at": nil, "position": position})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }

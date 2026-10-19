@@ -2,8 +2,10 @@ package notification
 
 import (
 	"context"
+	"log"
 	"unicode/utf8"
 
+	"github.com/TogetherBros/azit/proto"
 	"gorm.io/gorm"
 )
 
@@ -58,6 +60,23 @@ func Insert(tx *gorm.DB, notes []Notification) error {
 	return tx.Create(&notes).Error
 }
 
+// Publisher 는 실시간 배달을 맡는 쪽. hub.Hub 가 이걸 만족한다.
+type Publisher interface {
+	Publish(accountIDs []int64, ev any) error
+}
+
+// Publish 는 저장된 알림마다 받는 사람 한 명에게 notification.created 를 보낸다.
+// 반드시 저장(커밋)이 끝난 뒤에 부른다. Insert 가 채운 id·이름·시각이 그대로 나간다.
+// 배달 실패는 기록만 한다 (알림은 이미 저장됐고, 앱은 다시 붙으면 목록을 새로 받는다).
+func Publish(pub Publisher, notes []Notification) {
+	for _, n := range notes {
+		ev := proto.Event{Type: proto.EventNotificationCreated, Data: ToResponse(n)}
+		if err := pub.Publish([]int64{n.AccountID}, ev); err != nil {
+			log.Printf("실시간 배달 실패 (알림): %v", err)
+		}
+	}
+}
+
 // List 는 내 알림을 최신 순으로 limit 개.
 func (r *Repository) List(ctx context.Context, accountID int64, limit int) ([]Notification, error) {
 	var out []Notification
@@ -76,6 +95,13 @@ func (r *Repository) CountUnread(ctx context.Context, accountID int64) (int64, e
 		Where("account_id = ? AND is_read = ?", accountID, false).
 		Count(&n).Error
 	return n, err
+}
+
+// Read 는 내 알림 하나를 읽음으로 바꾼다. 남의 알림 id 면 아무것도 안 바뀐다.
+func (r *Repository) Read(ctx context.Context, accountID, notificationID int64) error {
+	return r.db.WithContext(ctx).Model(&Notification{}).
+		Where("account_id = ? AND notification_id = ?", accountID, notificationID).
+		Update("is_read", true).Error
 }
 
 // ReadAll 은 내 알림을 전부 읽음으로 바꾼다.

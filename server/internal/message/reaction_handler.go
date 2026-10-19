@@ -51,6 +51,7 @@ func (h *Handler) AddReaction(c fiber.Ctx) error {
 		return err
 	}
 
+	h.publishUpdated(ctx, m)
 	return h.respondReactions(c, me, m.MessageID)
 }
 
@@ -67,6 +68,7 @@ func (h *Handler) RemoveReaction(c fiber.Ctx) error {
 	if err := h.repo.RemoveReaction(c.Context(), m.MessageID, me.AccountID, text, memeID); err != nil {
 		return err
 	}
+	h.publishUpdated(c.Context(), m)
 	return h.respondReactions(c, me, m.MessageID)
 }
 

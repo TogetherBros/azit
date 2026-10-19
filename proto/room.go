@@ -18,6 +18,8 @@ type RoomResponse struct {
 	Name     string `json:"name"`
 	Position int    `json:"position"` // 작을수록 위
 	Unread   int64  `json:"unread"`   // 내가 안 읽은 메시지 수 (내가 보낸 것, 지운 것은 빼고)
+	// IsDefault 는 아지트를 만들 때 같이 생긴 기본 방 (처음 이름 "아지트"). 이름은 바꿀 수 있어도 지울 수는 없다.
+	IsDefault bool `json:"is_default"`
 }
 
 // ReorderRoomsRequest 는 PUT /v1/azits/{id}/rooms/order 의 요청이다.

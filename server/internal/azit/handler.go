@@ -3,30 +3,75 @@ package azit
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/TogetherBros/azit/proto"
 	"github.com/TogetherBros/azit/server/internal/account"
 	"github.com/TogetherBros/azit/server/internal/auth"
+	"github.com/TogetherBros/azit/server/internal/changelog"
 	"github.com/TogetherBros/azit/server/internal/httperr"
+	"github.com/TogetherBros/azit/server/internal/live"
 	"github.com/TogetherBros/azit/server/internal/member"
 	"github.com/TogetherBros/azit/server/internal/storage"
 	"github.com/gofiber/fiber/v3"
 )
+
+// Onliner 는 "지금 앱을 켜 두었나" 를 아는 쪽 (hub.Hub).
+type Onliner interface {
+	Online(accountID int64) bool
+}
+
+// UnreadCounter 는 방마다 안 읽은 수를 세는 쪽 (message.Repository). room.UnreadCounter 와 같은 모양.
+type UnreadCounter interface {
+	CountUnread(ctx context.Context, azitID, accountID int64) (map[int64]int64, error)
+}
 
 type Handler struct {
 	accountRepo *account.Repository
 	memberRepo  *member.Repository
 	azitRepo    *Repository
 	r2          *storage.R2
+	online      Onliner       // 홈 카드 "접속 N명"
+	unread      UnreadCounter // 홈 카드 안 읽은 수
+	live        *live.Live    // 기본 정보가 바뀌면 멤버들에게 알림 (nil 이면 안 보냄)
+	logs        *changelog.Repository
 }
 
-func NewHandler(accountRepo *account.Repository, memberRepo *member.Repository, azitRepo *Repository, r2 *storage.R2) *Handler {
+func NewHandler(accountRepo *account.Repository, memberRepo *member.Repository, azitRepo *Repository, r2 *storage.R2, online Onliner, unread UnreadCounter, lv *live.Live, logs *changelog.Repository) *Handler {
 	return &Handler{
 		accountRepo: accountRepo,
 		memberRepo:  memberRepo,
 		azitRepo:    azitRepo,
 		r2:          r2,
+		online:      online,
+		unread:      unread,
+		live:        lv,
+		logs:        logs,
 	}
+}
+
+// stats 는 홈 카드에 붙는 숫자: 지금 접속한 멤버 수, 내가 안 읽은 메시지 수 (모든 방 합).
+func (h *Handler) stats(ctx context.Context, azitID, accountID int64) (online, unread int64, err error) {
+	ids, err := h.memberRepo.ActiveIDs(ctx, azitID)
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, id := range ids {
+		if h.online != nil && h.online.Online(id) {
+			online++
+		}
+	}
+	if h.unread != nil {
+		perRoom, err := h.unread.CountUnread(ctx, azitID, accountID)
+		if err != nil {
+			return 0, 0, err
+		}
+		for _, n := range perRoom {
+			unread += n
+		}
+	}
+	return online, unread, nil
 }
 
 // Create 는 아지트를 만들고, 만든 사람을 super_admin 멤버로 넣는다. POST /v1/azits
@@ -120,8 +165,12 @@ func (h *Handler) List(c fiber.Ctx) error {
 			return err
 		}
 
-		// 내 역할·닉네임. 들어간 아지트는 몇 개 안 돼서 하나씩 읽는다.
+		// 내 역할·닉네임, 접속 수·안 읽은 수. 들어간 아지트는 몇 개 안 돼서 하나씩 읽는다.
 		me, err := h.memberRepo.FindActive(ctx, a.AzitID, accountID)
+		if err != nil {
+			return err
+		}
+		online, unread, err := h.stats(ctx, a.AzitID, accountID)
 		if err != nil {
 			return err
 		}
@@ -133,12 +182,35 @@ func (h *Handler) List(c fiber.Ctx) error {
 			Description: a.Description,
 			BannerURL:   bannerURL,
 			MemberCount: counts[a.AzitID],
+			OnlineCount: online,
+			Unread:      unread,
 			MyRole:      string(me.Role),
 			MyNickname:  me.NickName,
 		})
 	}
 
 	return c.JSON(res)
+}
+
+// infoSummary 는 변경 기록 한 줄 문구. 무엇이 바뀌었는지 나열한다.
+func infoSummary(old, cur Azit) string {
+	var parts []string
+	if old.Name != cur.Name {
+		parts = append(parts, fmt.Sprintf("이름을 '%s'(으)로", cur.Name))
+	}
+	if old.Color != cur.Color {
+		parts = append(parts, "색")
+	}
+	if old.Description != cur.Description {
+		parts = append(parts, "소개")
+	}
+	if old.BannerKey != cur.BannerKey {
+		parts = append(parts, "배너")
+	}
+	if len(parts) == 0 {
+		return "기본 정보를 저장함"
+	}
+	return "아지트 " + strings.Join(parts, ", ") + " 바꿈"
 }
 
 // bannerURL 은 배너 키로 보기 링크를 만든다. 키가 없으면 "".
@@ -190,13 +262,37 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		}
 	}
 
-	if err := h.azitRepo.Update(ctx, me.AzitID, input.Changes()); err != nil {
+	old, err := h.azitRepo.FindByID(ctx, me.AzitID) // 되돌리기용 바꾸기 전 값
+	if err != nil {
+		return err
+	}
+	changes := input.Changes()
+	if err := h.azitRepo.Update(ctx, me.AzitID, changes); err != nil {
 		return err
 	}
 
 	a, err := h.azitRepo.FindByID(ctx, me.AzitID)
 	if err != nil {
 		return err
+	}
+	if len(changes) > 0 {
+		before := map[string]any{}
+		for k := range changes {
+			switch k {
+			case "name":
+				before[k] = old.Name
+			case "color":
+				before[k] = old.Color
+			case "description":
+				before[k] = old.Description
+			case "banner_key":
+				before[k] = old.BannerKey
+			}
+		}
+		h.logs.Record(ctx, changelog.Entry{
+			AzitID: me.AzitID, ActorID: me.AccountID, ActorNick: me.NickName,
+			Kind: changelog.KindAzitInfo, Summary: infoSummary(old, a),
+		}, before)
 	}
 	counts, err := h.memberRepo.CountActive(ctx, []int64{a.AzitID})
 	if err != nil {
@@ -206,6 +302,14 @@ func (h *Handler) Update(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	online, unread, err := h.stats(ctx, a.AzitID, me.AccountID)
+	if err != nil {
+		return err
+	}
+
+	// 다른 멤버들의 왼쪽 아지트 이름·색도 바로 바뀌게
+	h.live.AzitChanged(ctx, a.AzitID, proto.ChangedInfo)
+
 	return c.JSON(proto.AzitResponse{
 		AzitID:      a.AzitID,
 		Name:        a.Name,
@@ -213,6 +317,8 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		Description: a.Description,
 		BannerURL:   bannerURL,
 		MemberCount: counts[a.AzitID],
+		OnlineCount: online,
+		Unread:      unread,
 		MyRole:      string(me.Role),
 		MyNickname:  me.NickName,
 	})

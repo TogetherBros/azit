@@ -73,6 +73,13 @@ func (r *Repository) SoftDelete(ctx context.Context, memeID int64) error {
 	})
 }
 
+// Undelete 는 지운 짤을 되살린다 (변경 기록 되돌리기). 맞장구 목록에서 빠진 칸은 돌아오지 않는다.
+func (r *Repository) Undelete(ctx context.Context, azitID, memeID int64) error {
+	return r.db.WithContext(ctx).Model(&Meme{}).
+		Where("azit_id = ? AND meme_id = ?", azitID, memeID).
+		Update("deleted_at", nil).Error
+}
+
 // ListReacts 는 아지트 맞장구 목록. 순서대로.
 func (r *Repository) ListReacts(ctx context.Context, azitID int64) ([]React, error) {
 	var reacts []React

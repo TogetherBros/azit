@@ -12,7 +12,9 @@ import (
 	"github.com/TogetherBros/azit/server/internal/auth"
 	"github.com/TogetherBros/azit/server/internal/azit"
 	"github.com/TogetherBros/azit/server/internal/httperr"
+	"github.com/TogetherBros/azit/server/internal/live"
 	"github.com/TogetherBros/azit/server/internal/member"
+	"github.com/TogetherBros/azit/server/internal/notification"
 	"github.com/TogetherBros/azit/server/internal/storage"
 	"github.com/gofiber/fiber/v3"
 )
@@ -37,15 +39,19 @@ type Handler struct {
 	memberRepo  *member.Repository
 	accountRepo *account.Repository
 	r2          *storage.R2
+	pub         notification.Publisher // 입장 알림 실시간 배달 (웹소켓)
+	live        *live.Live             // 들어오면 멤버 목록 바뀜 알림 (nil 이면 안 보냄)
 }
 
-func NewHandler(inviteRepo *Repository, azitRepo *azit.Repository, memberRepo *member.Repository, accountRepo *account.Repository, r2 *storage.R2) *Handler {
+func NewHandler(inviteRepo *Repository, azitRepo *azit.Repository, memberRepo *member.Repository, accountRepo *account.Repository, r2 *storage.R2, pub notification.Publisher, lv *live.Live) *Handler {
 	return &Handler{
 		inviteRepo:  inviteRepo,
 		azitRepo:    azitRepo,
 		memberRepo:  memberRepo,
 		accountRepo: accountRepo,
 		r2:          r2,
+		pub:         pub,
+		live:        lv,
 	}
 }
 
@@ -220,7 +226,7 @@ func (h *Handler) Join(c fiber.Ctx) error {
 		return err
 	}
 
-	azitID, err := h.inviteRepo.Join(ctx, JoinInput{
+	azitID, notes, err := h.inviteRepo.Join(ctx, JoinInput{
 		Code:      NormalizeCode(c.Params("code")),
 		AccountID: accountID,
 		Nickname:  acc.Nickname,
@@ -233,9 +239,15 @@ func (h *Handler) Join(c fiber.Ctx) error {
 		return httperr.New(fiber.StatusNotFound, proto.ErrCodeInviteUnusable, err.Error())
 	case errors.Is(err, ErrAlreadyMember):
 		return httperr.New(fiber.StatusConflict, proto.ErrCodeAlreadyMember, err.Error())
+	case errors.Is(err, ErrBanned):
+		return httperr.New(fiber.StatusForbidden, proto.ErrCodeForbidden, err.Error())
 	case err != nil:
 		return err
 	}
+
+	// 들어오기가 저장됐으니, 원래 멤버들에게 "누가 들어왔어요" 를 바로 보내고 멤버 목록도 다시 받게 한다.
+	notification.Publish(h.pub, notes)
+	h.live.AzitChanged(ctx, azitID, proto.ChangedMembers)
 
 	a, err := h.azitRepo.FindByID(ctx, azitID)
 	if err != nil {

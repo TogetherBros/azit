@@ -12,6 +12,9 @@ import (
 // ErrNotMember 는 그 아지트에 들어와 있지 않을 때 (나간 사람 포함).
 var ErrNotMember = errors.New("이 아지트 멤버가 아니에요")
 
+// ErrNotBanned 는 막힌 사람이 아닐 때.
+var ErrNotBanned = errors.New("막은 사람이 아니에요")
+
 type Repository struct {
 	db *gorm.DB
 }
@@ -101,6 +104,27 @@ func (r *Repository) ListActive(ctx context.Context, azitID int64) ([]Member, er
 	return members, err
 }
 
+// ActiveIDs 는 아지트에 지금 들어와 있는 멤버들의 계정 id.
+func (r *Repository) ActiveIDs(ctx context.Context, azitID int64) ([]int64, error) {
+	var ids []int64
+	err := r.db.WithContext(ctx).Model(&Member{}).
+		Where("azit_id = ? AND left_at IS NULL", azitID).
+		Pluck("account_id", &ids).Error
+	return ids, err
+}
+
+// CoMemberIDs 는 나와 같은 아지트에 지금 들어와 있는 사람들 (나 빼고, 겹치면 한 번만).
+// "누가 접속했다" 를 알릴 사람들이다.
+func (r *Repository) CoMemberIDs(ctx context.Context, accountID int64) ([]int64, error) {
+	var ids []int64
+	err := r.db.WithContext(ctx).Model(&Member{}).
+		Distinct("account_id").
+		Where("left_at IS NULL AND account_id <> ?", accountID).
+		Where("azit_id IN (?)", r.db.Model(&Member{}).Select("azit_id").Where("account_id = ? AND left_at IS NULL", accountID)).
+		Pluck("account_id", &ids).Error
+	return ids, err
+}
+
 // UpdateNickName 은 이 아지트 안 닉네임을 바꾼다.
 func (r *Repository) UpdateNickName(ctx context.Context, azitID, accountID int64, nickname string) error {
 	return r.db.WithContext(ctx).Model(&Member{}).
@@ -116,23 +140,82 @@ func (r *Repository) UpdateRole(ctx context.Context, azitID, accountID int64, ro
 }
 
 // Kick 은 멤버를 내보내고, 내보내진 사람에게 알림을 남긴다. 한 트랜잭션.
-// kicker 는 내보낸 사람 (알림에 "누가" 로 남는다).
-func (r *Repository) Kick(ctx context.Context, kicker Member, targetID int64, at time.Time) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+// kicker 는 내보낸 사람 (알림에 "누가" 로 남는다). ban 이면 막기도 같이 한다 (새 코드로도 못 들어오게).
+// 저장된 알림을 돌려준다 (커밋 뒤 실시간으로 보내려고).
+func (r *Repository) Kick(ctx context.Context, kicker Member, target Member, at time.Time, ban bool) ([]notification.Notification, error) {
+	notes := []notification.Notification{{
+		AccountID: target.AccountID,
+		Kind:      notification.KindKick,
+		AzitID:    kicker.AzitID,
+		ActorID:   kicker.AccountID,
+		ActorNick: kicker.NickName,
+	}}
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		err := tx.Model(&Member{}).
-			Where("azit_id = ? AND account_id = ? AND left_at IS NULL", kicker.AzitID, targetID).
+			Where("azit_id = ? AND account_id = ? AND left_at IS NULL", kicker.AzitID, target.AccountID).
 			Update("left_at", at).Error
 		if err != nil {
 			return err
 		}
-		return notification.Insert(tx, []notification.Notification{{
-			AccountID: targetID,
-			Kind:      notification.KindKick,
-			AzitID:    kicker.AzitID,
-			ActorID:   kicker.AccountID,
-			ActorNick: kicker.NickName,
-		}})
+		if ban {
+			err := tx.Save(&Ban{AzitID: kicker.AzitID, AccountID: target.AccountID, Nickname: target.NickName, BannedByNick: kicker.NickName}).Error
+			if err != nil {
+				return err
+			}
+		}
+		return notification.Insert(tx, notes)
 	})
+	if err != nil {
+		return nil, err
+	}
+	return notes, nil
+}
+
+// Restore 는 내보낸 사람을 다시 들여보낸다 (변경 기록 되돌리기). 막은 것도 푼다.
+// 그 사이 스스로 다시 들어와 있으면 아무것도 안 한다.
+func (r *Repository) Restore(ctx context.Context, azitID, accountID int64) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("azit_id = ? AND account_id = ?", azitID, accountID).Delete(&Ban{}).Error; err != nil {
+			return err
+		}
+		return tx.Model(&Member{}).
+			Where("azit_id = ? AND account_id = ? AND left_at IS NOT NULL", azitID, accountID).
+			Updates(map[string]any{"left_at": nil, "role": RoleMember}).Error
+	})
+}
+
+// IsBanned 는 이 아지트에서 막힌 사람인지.
+func IsBanned(tx *gorm.DB, azitID, accountID int64) (bool, error) {
+	var n int64
+	err := tx.Model(&Ban{}).Where("azit_id = ? AND account_id = ?", azitID, accountID).Count(&n).Error
+	return n > 0, err
+}
+
+// ListBans 는 막은 사람들 (최근 순).
+func (r *Repository) ListBans(ctx context.Context, azitID int64) ([]Ban, error) {
+	var out []Ban
+	err := r.db.WithContext(ctx).Where("azit_id = ?", azitID).Order("created_at DESC").Find(&out).Error
+	return out, err
+}
+
+// FindBan 은 막은 줄 하나. 없으면 ErrNotMember 와 같은 404 로 다룬다.
+func (r *Repository) FindBan(ctx context.Context, azitID, accountID int64) (Ban, error) {
+	var b Ban
+	err := r.db.WithContext(ctx).Where("azit_id = ? AND account_id = ?", azitID, accountID).First(&b).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return Ban{}, ErrNotBanned
+	}
+	return b, err
+}
+
+// Unban 은 막은 것을 푼다. 다시 들어오려면 새 초대 코드가 필요하다.
+func (r *Repository) Unban(ctx context.Context, azitID, accountID int64) error {
+	return r.db.WithContext(ctx).Where("azit_id = ? AND account_id = ?", azitID, accountID).Delete(&Ban{}).Error
+}
+
+// Reban 은 풀었던 것을 다시 막는다 (변경 기록 되돌리기).
+func (r *Repository) Reban(ctx context.Context, b Ban) error {
+	return r.db.WithContext(ctx).Save(&b).Error
 }
 
 // Leave 는 멤버를 나간 상태로 만든다 (스스로 나가기, 내보내기 둘 다). 줄은 지우지 않는다:

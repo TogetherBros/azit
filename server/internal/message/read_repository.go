@@ -49,6 +49,7 @@ func (r *Repository) CountUnread(ctx context.Context, azitID, accountID int64) (
 		Joins("LEFT JOIN room_reads AS r ON r.room_id = m.room_id AND r.account_id = ?", accountID).
 		Where("m.azit_id = ? AND m.sender_id <> ? AND m.deleted_at IS NULL", azitID, accountID).
 		Where("m.message_id > COALESCE(r.last_read_message_id, 0)").
+		Where("m.room_id IN (SELECT room_id FROM rooms WHERE azit_id = ? AND deleted_at IS NULL)", azitID). // 지운 방은 안 센다
 		Group("m.room_id").
 		Scan(&rows).Error
 	if err != nil {

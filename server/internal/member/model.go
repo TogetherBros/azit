@@ -13,3 +13,13 @@ type Member struct {
 	LeftAt     *time.Time // 나갔으면 그 시각, 들어와 있으면 nil
 	InviteCode string     `gorm:"not null;default:''"` // 들어올 때 쓴 코드. 만든 사람은 ""
 }
+
+// Ban 은 막은 사람. 이 줄이 있으면 새 초대 코드로도 이 아지트에 다시 못 들어온다.
+// 풀면 줄을 지운다 (풀어도 자동으로 다시 들어오진 않는다. 새 코드가 필요하다).
+type Ban struct {
+	AzitID       int64  `gorm:"primaryKey"`
+	AccountID    int64  `gorm:"primaryKey"`
+	Nickname     string `gorm:"not null;default:''"` // 막을 때의 아지트 닉네임
+	BannedByNick string `gorm:"not null;default:''"`
+	CreatedAt    time.Time
+}

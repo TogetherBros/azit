@@ -13,6 +13,21 @@ type MemberResponse struct {
 	Bio       string    `json:"bio"`
 	Role      string    `json:"role"` // super_admin, admin, member
 	JoinedAt  time.Time `json:"joined_at"`
+	Online    bool      `json:"online"` // 지금 앱을 켜 두었는지 (실시간 연결이 있는지)
+}
+
+// BanResponse 는 막은 사람 한 명. GET /v1/azits/{id}/bans
+type BanResponse struct {
+	AccountID     int64     `json:"account_id"`
+	Name          string    `json:"name"`     // 계정 이름 (@)
+	Nickname      string    `json:"nickname"` // 막을 때의 아지트 닉네임
+	BannedByNick  string    `json:"banned_by_nickname"`
+	BannedAt      time.Time `json:"banned_at"`
+}
+
+// KickRequest 는 DELETE /v1/azits/{id}/members/{accountId} 의 요청이다. 본문이 없으면 ban=false.
+type KickRequest struct {
+	Ban bool `json:"ban"` // true 면 막기: 새 초대 코드로도 다시 못 들어온다
 }
 
 // UpdateMyMemberRequest 는 PATCH /v1/azits/{id}/members/me 의 요청이다. 이 아지트 안 내 닉네임을 바꾼다.

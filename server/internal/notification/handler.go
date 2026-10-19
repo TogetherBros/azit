@@ -18,6 +18,19 @@ func NewHandler(repo *Repository) *Handler {
 func (h *Handler) Routes(r fiber.Router) {
 	r.Get("/", h.List)
 	r.Post("/read-all", h.ReadAll)
+	r.Post("/:id/read", h.Read)
+}
+
+// Read 는 알림 하나를 읽음으로. POST /v1/notifications/{id}/read (알림을 눌렀을 때)
+func (h *Handler) Read(c fiber.Ctx) error {
+	id := fiber.Params[int64](c, "id")
+	if id <= 0 {
+		return fiber.ErrBadRequest
+	}
+	if err := h.repo.Read(c.Context(), auth.AccountID(c), id); err != nil {
+		return err
+	}
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // List 는 내 알림 최신 50개와 안 읽은 수. GET /v1/notifications
@@ -37,22 +50,27 @@ func (h *Handler) List(c fiber.Ctx) error {
 
 	res := proto.NotificationListResponse{Notifications: make([]proto.NotificationResponse, 0, len(rows)), Unread: unread}
 	for _, n := range rows {
-		res.Notifications = append(res.Notifications, proto.NotificationResponse{
-			NotificationID: n.NotificationID,
-			Kind:           string(n.Kind),
-			AzitID:         n.AzitID,
-			AzitName:       n.AzitName,
-			RoomID:         n.RoomID,
-			RoomName:       n.RoomName,
-			MessageID:      n.MessageID,
-			ActorID:        n.ActorID,
-			ActorNickname:  n.ActorNick,
-			Preview:        n.Preview,
-			Read:           n.IsRead,
-			CreatedAt:      n.CreatedAt,
-		})
+		res.Notifications = append(res.Notifications, ToResponse(n))
 	}
 	return c.JSON(res)
+}
+
+// ToResponse 는 알림 한 줄을 응답 모양으로 바꾼다. 목록 응답과 실시간 이벤트(notification.created)가 같이 쓴다.
+func ToResponse(n Notification) proto.NotificationResponse {
+	return proto.NotificationResponse{
+		NotificationID: n.NotificationID,
+		Kind:           string(n.Kind),
+		AzitID:         n.AzitID,
+		AzitName:       n.AzitName,
+		RoomID:         n.RoomID,
+		RoomName:       n.RoomName,
+		MessageID:      n.MessageID,
+		ActorID:        n.ActorID,
+		ActorNickname:  n.ActorNick,
+		Preview:        n.Preview,
+		Read:           n.IsRead,
+		CreatedAt:      n.CreatedAt,
+	}
 }
 
 // ReadAll 은 내 알림을 전부 읽음으로. POST /v1/notifications/read-all

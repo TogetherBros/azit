@@ -34,8 +34,10 @@ func newApp(cfg config.Config, h *handlers, tokenProvider *auth.TokenProvider) *
 	h.message.Routes(azits, h.requireMember)
 	h.meme.Routes(azits, h.requireMember)
 	h.member.Routes(azits, h.requireMember)
+	h.log.Routes(azits, h.requireMember)
 	h.invite.Routes(api.Group("/invites", requireAuth))
 	h.notif.Routes(api.Group("/notifications", requireAuth))
+	h.ws.Routes(api.Group("/ws", requireAuth)) // 실시간 (서버 → 앱)
 
 	if cfg.Dev {
 		app.Get("/dev/token", h.auth.DevToken)

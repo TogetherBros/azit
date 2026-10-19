@@ -25,7 +25,7 @@ func TestJoin_NotifiesExistingMembers(t *testing.T) {
 	}
 	sqlDB, _ := conn.DB()
 	t.Cleanup(func() { sqlDB.Close() })
-	if err := conn.AutoMigrate(&Invite{}, &member.Member{}, &notification.Notification{}, &testAzit{}); err != nil {
+	if err := conn.AutoMigrate(&Invite{}, &member.Member{}, &member.Ban{}, &notification.Notification{}, &testAzit{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -37,8 +37,13 @@ func TestJoin_NotifiesExistingMembers(t *testing.T) {
 	conn.Create(&Invite{AzitID: 1, Code: "ABCD2345", CreatedBy: 1})
 
 	repo := NewRepository(conn)
-	if _, err := repo.Join(t.Context(), JoinInput{Code: "ABCD2345", AccountID: 4, Nickname: "새친구", Now: time.Now()}); err != nil {
+	_, returned, err := repo.Join(t.Context(), JoinInput{Code: "ABCD2345", AccountID: 4, Nickname: "새친구", Now: time.Now()})
+	if err != nil {
 		t.Fatalf("Join 실패: %v", err)
+	}
+	// 커밋 뒤 실시간으로 보낼 수 있게, 저장된 알림(id 채워짐)을 돌려준다
+	if len(returned) != 2 || returned[0].NotificationID == 0 {
+		t.Errorf("돌려받은 알림 = %+v, want 2개 (id 채워짐)", returned)
 	}
 
 	var notes []notification.Notification
@@ -50,5 +55,10 @@ func TestJoin_NotifiesExistingMembers(t *testing.T) {
 		if n.Kind != notification.KindJoin || n.ActorID != 4 || n.ActorNick != "새친구" || n.AzitName != "의성" {
 			t.Errorf("알림 = %+v", n)
 		}
+	}
+	// 막힌 사람은 새 코드로도 못 들어온다
+	conn.Create(&member.Ban{AzitID: 1, AccountID: 9, Nickname: "막힘"})
+	if _, _, err := repo.Join(t.Context(), JoinInput{Code: "ABCD2345", AccountID: 9, Nickname: "막힘", Now: time.Now()}); err != ErrBanned {
+		t.Errorf("막힌 사람 Join err = %v, want ErrBanned", err)
 	}
 }

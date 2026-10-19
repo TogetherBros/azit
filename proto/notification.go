@@ -18,6 +18,18 @@ type NotificationResponse struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 
+// ChangeLogResponse 는 변경 기록 한 줄. GET /v1/azits/{id}/log
+type ChangeLogResponse struct {
+	EntryID       int64      `json:"entry_id"`
+	Kind          string     `json:"kind"`           // azit.info, room.rename, member.kick …
+	ActorNickname string     `json:"actor_nickname"` // 바꾼 사람 (그때의 아지트 닉네임)
+	Summary       string     `json:"summary"`        // "'게임방' 방 이름을 '마크방'(으)로"
+	CreatedAt     time.Time  `json:"created_at"`
+	Undoable      bool       `json:"undoable"`       // 되돌리기 버튼을 보여 줄지 (이미 되돌렸으면 false)
+	UndoneAt      *time.Time `json:"undone_at"`      // 되돌렸으면 그 시각
+	UndoneBy      string     `json:"undone_by_nickname"`
+}
+
 // NotificationListResponse 는 GET /v1/notifications 의 응답이다.
 type NotificationListResponse struct {
 	Notifications []NotificationResponse `json:"notifications"` // 최신 순 50개

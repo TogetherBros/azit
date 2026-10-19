@@ -24,6 +24,8 @@ type AzitResponse struct {
 	Description string `json:"description"` // 한 줄 소개. 없으면 ""
 	BannerURL   string `json:"banner_url"`  // 없으면 ""
 	MemberCount int64  `json:"member_count"`
+	OnlineCount int64  `json:"online_count"` // 지금 앱을 켜 둔 멤버 수 (나 포함)
+	Unread      int64  `json:"unread"`       // 이 아지트 모든 방의 내가 안 읽은 메시지 수 합
 	MyRole      string `json:"my_role"`     // 이 아지트에서 내 역할: super_admin, admin, member. 초대 미리보기처럼 아직 멤버가 아니면 ""
 	MyNickname  string `json:"my_nickname"` // 이 아지트 안 내 닉네임. 멤버가 아니면 ""
 }

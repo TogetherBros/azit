@@ -3,6 +3,7 @@ package member
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -10,21 +11,33 @@ import (
 
 	"github.com/TogetherBros/azit/proto"
 	"github.com/TogetherBros/azit/server/internal/account"
+	"github.com/TogetherBros/azit/server/internal/changelog"
 	"github.com/TogetherBros/azit/server/internal/httperr"
+	"github.com/TogetherBros/azit/server/internal/live"
+	"github.com/TogetherBros/azit/server/internal/notification"
 	"github.com/TogetherBros/azit/server/internal/storage"
 	"github.com/gofiber/fiber/v3"
 )
 
 const maxNickName = 16 // 계정 닉네임과 같은 규칙
 
+// Onliner 는 "지금 앱을 켜 두었나" 를 아는 쪽 (hub.Hub).
+type Onliner interface {
+	Online(accountID int64) bool
+}
+
 type Handler struct {
 	memberRepo  *Repository
 	accountRepo *account.Repository
 	r2          *storage.R2
+	pub         notification.Publisher // 내보내기 알림 실시간 배달 (웹소켓)
+	online      Onliner                // 멤버 목록의 "접속 중" (nil 이면 전부 false)
+	live        *live.Live             // 멤버가 바뀌면 같은 아지트 사람들에게 알림 (nil 이면 안 보냄)
+	logs        *changelog.Repository  // 변경 기록 (nil 이면 안 남김)
 }
 
-func NewHandler(memberRepo *Repository, accountRepo *account.Repository, r2 *storage.R2) *Handler {
-	return &Handler{memberRepo: memberRepo, accountRepo: accountRepo, r2: r2}
+func NewHandler(memberRepo *Repository, accountRepo *account.Repository, r2 *storage.R2, pub notification.Publisher, online Onliner, lv *live.Live, logs *changelog.Repository) *Handler {
+	return &Handler{memberRepo: memberRepo, accountRepo: accountRepo, r2: r2, pub: pub, online: online, live: lv, logs: logs}
 }
 
 // Routes 는 /v1/azits 그룹 아래에 멤버 경로를 단다.
@@ -36,6 +49,8 @@ func (h *Handler) Routes(r fiber.Router, requireMember fiber.Handler) {
 	r.Delete("/:id/members/me", requireMember, h.Leave)
 	r.Patch("/:id/members/:accountId/role", requireMember, h.UpdateRole)
 	r.Delete("/:id/members/:accountId", requireMember, h.Kick)
+	r.Get("/:id/bans", requireMember, h.ListBans)
+	r.Delete("/:id/bans/:accountId", requireMember, h.Unban)
 }
 
 // List 는 지금 들어와 있는 멤버 목록. 멤버면 누구나. GET /v1/azits/{id}/members
@@ -74,6 +89,7 @@ func (h *Handler) UpdateMe(c fiber.Ctx) error {
 		return err
 	}
 	me.NickName = nick
+	h.live.AzitChanged(c.Context(), me.AzitID, proto.ChangedMembers)
 	return h.respondOne(c, me)
 }
 
@@ -87,6 +103,7 @@ func (h *Handler) Leave(c fiber.Ctx) error {
 	if err := h.memberRepo.Leave(c.Context(), me.AzitID, me.AccountID, time.Now()); err != nil {
 		return err
 	}
+	h.live.AzitChanged(c.Context(), me.AzitID, proto.ChangedMembers)
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
@@ -118,13 +135,21 @@ func (h *Handler) UpdateRole(c fiber.Ctx) error {
 	if err := h.memberRepo.UpdateRole(c.Context(), me.AzitID, target.AccountID, role); err != nil {
 		return err
 	}
+	if role != target.Role {
+		h.logs.Record(c.Context(), changelog.Entry{
+			AzitID: me.AzitID, ActorID: me.AccountID, ActorNick: me.NickName,
+			Kind: changelog.KindMemberRole, TargetID: target.AccountID,
+			Summary: fmt.Sprintf("%s 님을 %s(으)로", target.NickName, roleName(role)),
+		}, map[string]string{"role": string(target.Role)})
+	}
 	target.Role = role
+	h.live.AzitChanged(c.Context(), me.AzitID, proto.ChangedMembers)
 	return h.respondOne(c, target)
 }
 
-// Kick 은 멤버를 내보낸다. DELETE /v1/azits/{id}/members/{accountId}
+// Kick 은 멤버를 내보낸다. DELETE /v1/azits/{id}/members/{accountId} (본문 {"ban": true} 면 막기도)
 // 관리자 이상만, 그리고 나보다 역할이 낮은 사람만 (관리자는 멤버만, 만든 사람은 관리자와 멤버).
-// 내보내진 사람도 초대 코드가 있으면 다시 들어올 수 있다.
+// 막지 않았으면 내보내진 사람도 초대 코드가 있으면 다시 들어올 수 있다.
 func (h *Handler) Kick(c fiber.Ctx) error {
 	me := Current(c)
 	if !me.Role.AtLeast(RoleAdmin) {
@@ -139,9 +164,83 @@ func (h *Handler) Kick(c fiber.Ctx) error {
 		return forbidden("나보다 역할이 낮은 사람만 내보낼 수 있어요")
 	}
 
-	if err := h.memberRepo.Kick(c.Context(), me, target.AccountID, time.Now()); err != nil {
+	var req proto.KickRequest
+	if len(c.Body()) > 0 { // 본문 없이 보내도 된다 (예전 앱)
+		if err := c.Bind().JSON(&req); err != nil {
+			return fiber.ErrBadRequest
+		}
+	}
+
+	notes, err := h.memberRepo.Kick(c.Context(), me, target, time.Now(), req.Ban)
+	if err != nil {
 		return err
 	}
+	summary := fmt.Sprintf("%s 님을 내보냄", target.NickName)
+	if req.Ban {
+		summary = fmt.Sprintf("%s 님을 내보내고 막음", target.NickName)
+	}
+	h.logs.Record(c.Context(), changelog.Entry{
+		AzitID: me.AzitID, ActorID: me.AccountID, ActorNick: me.NickName,
+		Kind: changelog.KindMemberKick, TargetID: target.AccountID, Summary: summary,
+	}, nil)
+
+	// 내보내진 사람의 앱에 바로 알린다 (그 아지트 화면에서 나가게). 남은 멤버들은 멤버 목록을 다시 받는다.
+	notification.Publish(h.pub, notes)
+	h.live.AzitChanged(c.Context(), me.AzitID, proto.ChangedMembers)
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// ListBans 는 막은 사람 목록. 관리자 이상. GET /v1/azits/{id}/bans
+func (h *Handler) ListBans(c fiber.Ctx) error {
+	me := Current(c)
+	if !me.Role.AtLeast(RoleAdmin) {
+		return forbidden("관리자만 볼 수 있어요")
+	}
+	bans, err := h.memberRepo.ListBans(c.Context(), me.AzitID)
+	if err != nil {
+		return err
+	}
+	ids := make([]int64, 0, len(bans))
+	for _, b := range bans {
+		ids = append(ids, b.AccountID)
+	}
+	accounts, err := h.accountRepo.FindByIDs(c.Context(), ids)
+	if err != nil {
+		return err
+	}
+	res := make([]proto.BanResponse, 0, len(bans))
+	for _, b := range bans {
+		name := ""
+		if acc := accounts[b.AccountID]; acc.Name != nil {
+			name = *acc.Name
+		}
+		res = append(res, proto.BanResponse{AccountID: b.AccountID, Name: name, Nickname: b.Nickname, BannedByNick: b.BannedByNick, BannedAt: b.CreatedAt})
+	}
+	return c.JSON(res)
+}
+
+// Unban 은 막은 것을 푼다. 관리자 이상. DELETE /v1/azits/{id}/bans/{accountId}
+// 풀어도 자동으로 다시 들어오진 않는다. 새 초대 코드가 필요하다.
+func (h *Handler) Unban(c fiber.Ctx) error {
+	me := Current(c)
+	if !me.Role.AtLeast(RoleAdmin) {
+		return forbidden("관리자만 풀 수 있어요")
+	}
+	b, err := h.memberRepo.FindBan(c.Context(), me.AzitID, fiber.Params[int64](c, "accountId"))
+	if errors.Is(err, ErrNotBanned) {
+		return httperr.New(fiber.StatusNotFound, proto.ErrCodeNotFound, err.Error())
+	}
+	if err != nil {
+		return err
+	}
+	if err := h.memberRepo.Unban(c.Context(), me.AzitID, b.AccountID); err != nil {
+		return err
+	}
+	h.logs.Record(c.Context(), changelog.Entry{
+		AzitID: me.AzitID, ActorID: me.AccountID, ActorNick: me.NickName,
+		Kind: changelog.KindMemberUnban, TargetID: b.AccountID,
+		Summary: fmt.Sprintf("%s 님 막은 것을 풂", b.Nickname),
+	}, b)
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
@@ -169,7 +268,7 @@ func (h *Handler) respondOne(c fiber.Ctx, m Member) error {
 	return c.JSON(res[0])
 }
 
-// toResponses 는 멤버 줄에 계정 정보(이름, 색, 사진, 소개)를 붙인다. 비어 있어도 [] 로 나가게.
+// toResponses 는 멤버 줄에 계정 정보(이름, 색, 사진, 소개)와 접속 중인지를 붙인다. 비어 있어도 [] 로 나가게.
 func (h *Handler) toResponses(ctx context.Context, members []Member) ([]proto.MemberResponse, error) {
 	ids := make([]int64, 0, len(members))
 	for _, m := range members {
@@ -208,6 +307,7 @@ func (h *Handler) toResponses(ctx context.Context, members []Member) ([]proto.Me
 			Bio:       acc.Bio,
 			Role:      string(m.Role),
 			JoinedAt:  m.JoinedAt,
+			Online:    h.online != nil && h.online.Online(m.AccountID),
 		})
 	}
 	return res, nil
@@ -218,6 +318,16 @@ func sortByRole(res []proto.MemberResponse) {
 	slices.SortStableFunc(res, func(a, b proto.MemberResponse) int {
 		return rank[Role(b.Role)] - rank[Role(a.Role)]
 	})
+}
+
+func roleName(r Role) string {
+	switch r {
+	case RoleSuperAdmin:
+		return "만든 사람"
+	case RoleAdmin:
+		return "관리자"
+	}
+	return "멤버"
 }
 
 func badRequest(msg string) error {

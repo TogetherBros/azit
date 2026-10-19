@@ -64,6 +64,16 @@ func (r *R2) PresignGet(ctx context.Context, key string) (string, error) {
 	return req.URL, nil
 }
 
+// Copy 는 버킷 안에서 파일을 복사한다 (채팅 사진 → 내 짤 폴더).
+func (r *R2) Copy(ctx context.Context, srcKey, dstKey string) error {
+	_, err := r.client.CopyObject(ctx, &s3.CopyObjectInput{
+		Bucket:     aws.String(r.bucket),
+		CopySource: aws.String(r.bucket + "/" + srcKey),
+		Key:        aws.String(dstKey),
+	})
+	return err
+}
+
 func (r *R2) Head(ctx context.Context, key string) (int64, string, error) {
 	out, err := r.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(r.bucket),

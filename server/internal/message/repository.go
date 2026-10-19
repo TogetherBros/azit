@@ -63,6 +63,18 @@ func (r *Repository) FindByTempID(ctx context.Context, senderID int64, tempID st
 	return m, err
 }
 
+// PhotoKey 는 이 아지트의 지우지 않은 사진 메시지에서 R2 키를 꺼낸다 (짤로 저장할 때). meme.PhotoSource 를 만족한다.
+func (r *Repository) PhotoKey(ctx context.Context, azitID, messageID int64) (string, error) {
+	var m Message
+	err := r.db.WithContext(ctx).
+		Where("message_id = ? AND azit_id = ? AND deleted_at IS NULL", messageID, azitID).
+		First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) || (err == nil && m.Kind != KindPhoto && m.Kind != KindMeme) {
+		return "", errors.New("짤로 저장할 사진이 없어요")
+	}
+	return m.Body, err
+}
+
 // FindByID 는 메시지 하나를 찾는다. 없으면 ErrNotFound.
 func (r *Repository) FindByID(ctx context.Context, messageID int64) (Message, error) {
 	var m Message

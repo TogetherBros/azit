@@ -54,7 +54,7 @@ func newUpdateEnv(t *testing.T) updateEnv {
 	r2, err := storage.NewR2("test", "key", "secret", "bucket")
 	must(t, err)
 	memberRepo := member.NewRepository(conn)
-	h := NewHandler(account.NewRepository(conn), memberRepo, repo, r2)
+	h := NewHandler(account.NewRepository(conn), memberRepo, repo, r2, nil, nil, nil, nil)
 
 	p := auth.NewTokenProvider("test-secret", time.Minute, time.Hour)
 	ot, err := p.IssueAccessToken(owner.ID)

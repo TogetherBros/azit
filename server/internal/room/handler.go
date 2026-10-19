@@ -3,9 +3,12 @@ package room
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/TogetherBros/azit/proto"
+	"github.com/TogetherBros/azit/server/internal/changelog"
 	"github.com/TogetherBros/azit/server/internal/httperr"
+	"github.com/TogetherBros/azit/server/internal/live"
 	"github.com/TogetherBros/azit/server/internal/member"
 	"github.com/gofiber/fiber/v3"
 )
@@ -23,10 +26,12 @@ type UnreadCounter interface {
 type Handler struct {
 	roomRepo *Repository
 	unread   UnreadCounter
+	live     *live.Live            // 방이 바뀌면 멤버들에게 알림 (nil 이면 안 보냄)
+	logs     *changelog.Repository // 변경 기록 (nil 이면 안 남김)
 }
 
-func NewHandler(roomRepo *Repository, unread UnreadCounter) *Handler {
-	return &Handler{roomRepo: roomRepo, unread: unread}
+func NewHandler(roomRepo *Repository, unread UnreadCounter, lv *live.Live, logs *changelog.Repository) *Handler {
+	return &Handler{roomRepo: roomRepo, unread: unread, live: lv, logs: logs}
 }
 
 // Routes 는 /v1/azits 그룹 아래에 방 경로를 단다.
@@ -36,6 +41,42 @@ func (h *Handler) Routes(r fiber.Router, requireMember fiber.Handler) {
 	r.Post("/:id/rooms", requireMember, h.Create)
 	r.Put("/:id/rooms/order", requireMember, h.Reorder)
 	r.Patch("/:id/rooms/:roomId", requireMember, h.Rename)
+	r.Delete("/:id/rooms/:roomId", requireMember, h.Delete)
+}
+
+// Delete 는 방을 지운다. 관리자 이상만. DELETE /v1/azits/{id}/rooms/{roomId}
+// 메시지는 남기고 방만 숨긴다. 변경 기록에서 되돌리면 다시 보인다. 마지막 방은 못 지운다.
+func (h *Handler) Delete(c fiber.Ctx) error {
+	me := member.Current(c)
+	if err := requireAdmin(me); err != nil {
+		return err
+	}
+	roomID := fiber.Params[int64](c, "roomId")
+	room, err := h.roomRepo.FindByID(c.Context(), roomID)
+	if errors.Is(err, ErrNotFound) || (err == nil && room.AzitID != me.AzitID) {
+		return httperr.New(fiber.StatusNotFound, proto.ErrCodeNotFound, ErrNotFound.Error())
+	}
+	if err != nil {
+		return err
+	}
+
+	err = h.roomRepo.Delete(c.Context(), me.AzitID, roomID)
+	if errors.Is(err, ErrLastRoom) || errors.Is(err, ErrDefaultRoom) {
+		return httperr.New(fiber.StatusBadRequest, proto.ErrCodeBadRequest, err.Error())
+	}
+	if errors.Is(err, ErrNotFound) {
+		return httperr.New(fiber.StatusNotFound, proto.ErrCodeNotFound, err.Error())
+	}
+	if err != nil {
+		return err
+	}
+
+	h.logs.Record(c.Context(), changelog.Entry{
+		AzitID: me.AzitID, ActorID: me.AccountID, ActorNick: me.NickName,
+		Kind: changelog.KindRoomDelete, TargetID: roomID, Summary: fmt.Sprintf("'%s' 방을 지움", room.Name),
+	}, nil)
+	h.live.AzitChanged(c.Context(), me.AzitID, proto.ChangedRooms)
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // List 는 아지트의 방 목록. 멤버면 누구나. GET /v1/azits/{id}/rooms
@@ -69,6 +110,11 @@ func (h *Handler) Create(c fiber.Ctx) error {
 	if err := h.roomRepo.Create(c.Context(), &room); err != nil {
 		return err
 	}
+	h.logs.Record(c.Context(), changelog.Entry{
+		AzitID: me.AzitID, ActorID: me.AccountID, ActorNick: me.NickName,
+		Kind: changelog.KindRoomCreate, TargetID: room.RoomID, Summary: fmt.Sprintf("'%s' 방을 만듦", room.Name),
+	}, nil)
+	h.live.AzitChanged(c.Context(), me.AzitID, proto.ChangedRooms)
 
 	return c.Status(fiber.StatusCreated).JSON(toResponse(room))
 }
@@ -107,6 +153,13 @@ func (h *Handler) Rename(c fiber.Ctx) error {
 	if err := h.roomRepo.Rename(c.Context(), roomID, name); err != nil {
 		return err
 	}
+	if name != room.Name {
+		h.logs.Record(c.Context(), changelog.Entry{
+			AzitID: me.AzitID, ActorID: me.AccountID, ActorNick: me.NickName,
+			Kind: changelog.KindRoomRename, TargetID: roomID, Summary: fmt.Sprintf("'%s' 방 이름을 '%s'(으)로", room.Name, name),
+		}, map[string]string{"name": room.Name})
+		h.live.AzitChanged(c.Context(), me.AzitID, proto.ChangedRooms)
+	}
 
 	room.Name = name
 	return c.JSON(toResponse(room))
@@ -125,13 +178,26 @@ func (h *Handler) Reorder(c fiber.Ctx) error {
 		return fiber.ErrBadRequest
 	}
 
-	err := h.roomRepo.Reorder(c.Context(), me.AzitID, req.RoomIDs)
+	before, err := h.roomRepo.ListByAzit(c.Context(), me.AzitID) // 되돌리기용 옛 순서
+	if err != nil {
+		return err
+	}
+	err = h.roomRepo.Reorder(c.Context(), me.AzitID, req.RoomIDs)
 	if errors.Is(err, ErrBadOrder) {
 		return httperr.New(fiber.StatusBadRequest, proto.ErrCodeBadRequest, err.Error())
 	}
 	if err != nil {
 		return err
 	}
+	oldIDs := make([]int64, 0, len(before))
+	for _, r := range before {
+		oldIDs = append(oldIDs, r.RoomID)
+	}
+	h.logs.Record(c.Context(), changelog.Entry{
+		AzitID: me.AzitID, ActorID: me.AccountID, ActorNick: me.NickName,
+		Kind: changelog.KindRoomOrder, Summary: "방 순서를 바꿈",
+	}, map[string][]int64{"room_ids": oldIDs})
+	h.live.AzitChanged(c.Context(), me.AzitID, proto.ChangedRooms)
 
 	return h.writeList(c, me)
 }
@@ -147,9 +213,15 @@ func (h *Handler) writeList(c fiber.Ctx, me member.Member) error {
 		return err
 	}
 
+	def, err := h.roomRepo.DefaultID(c.Context(), me.AzitID)
+	if err != nil {
+		return err
+	}
+
 	res := toResponses(rooms)
 	for i := range res {
 		res[i].Unread = unread[res[i].RoomID] // 없는 방은 0
+		res[i].IsDefault = res[i].RoomID == def
 	}
 	return c.JSON(res)
 }
