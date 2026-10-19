@@ -82,7 +82,10 @@ jobs:
             "${{ secrets.EC2_HOST }}" "$EC2_USER" > ~/.ssh/config
 
       - name: compose 파일 복사
-        run: scp deploy/docker-compose.yml deploy/Caddyfile "ec2:$APP_DIR/"
+        run: |
+          ssh ec2 "mkdir -p $APP_DIR/caddy $APP_DIR/downloads"
+          scp deploy/docker-compose.yml "ec2:$APP_DIR/"
+          scp deploy/Caddyfile "ec2:$APP_DIR/caddy/"
 
       # 서버 비밀값은 GitHub Secrets 에만 있고, 배포 때마다 server.env 로 덮어쓴다.
       # 명령줄이 아니라 stdin 으로 넘겨서 로그나 ps 에 안 남는다.
@@ -112,6 +115,7 @@ jobs:
             echo 'AZIT_IMAGE=$IMAGE:$SHA' > .env
             docker compose pull
             docker compose up -d --remove-orphans
+            docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
             docker image prune -f
           "
 

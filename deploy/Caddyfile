@@ -16,5 +16,15 @@ api.togetherbros.uk {
 	}
 
 	encode zstd gzip
+
+	# 데스크톱 앱 설치 파일과 latest.json (릴리스 워크플로가 /opt/azit/downloads 에 올린다)
+	#   https://api.togetherbros.uk/download/            파일 목록
+	#   https://api.togetherbros.uk/download/latest.json  앱이 업데이트 확인할 때 보는 파일
+	handle_path /download/* {
+		root * /srv/downloads
+		header /latest.json Cache-Control "no-cache"
+		file_server browse
+	}
+
 	reverse_proxy server:8081
 }

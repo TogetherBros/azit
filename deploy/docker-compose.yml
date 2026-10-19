@@ -3,7 +3,8 @@
 # docker compose up -d 를 한다.
 #
 # /opt/azit 에 생기는 파일
-#   docker-compose.yml, Caddyfile  저장소의 deploy/ 에서 복사
+#   docker-compose.yml, caddy/Caddyfile  저장소의 deploy/ 에서 복사
+#   downloads/                     데스크톱 앱 설치 파일 (release-desktop 워크플로가 올림)
 #   server.env                      GitHub Secrets 로 Actions 가 만듦 (서버 비밀값)
 #   .env                            AZIT_IMAGE=이번에 배포할 이미지 태그 (compose 변수)
 
@@ -42,7 +43,9 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # 파일 하나가 아니라 폴더로 붙여야, 배포 때 Caddyfile 을 바꾸고 reload 하면 새 내용이 보인다.
+      - ./caddy:/etc/caddy:ro
+      - ./downloads:/srv/downloads:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:
