@@ -6,23 +6,26 @@ import { roomColor } from '../../lib/color'
 
 type Props = {
   room: Room
-  madeBy: string // "강백호가 만듦"
-  messageCount: number
+  madeBy?: string // "강백호가 만듦" (모르면 생략)
+  messageCount?: number
   members: Member[] // 접속 중인 사람 먼저
   meId: string
+  onProfile?: (id: string) => void // 멤버 누르기 → 프로필
+  onClose?: () => void
 }
 
 // 채팅 머리의 "N명" 을 누르면 뜨는 방 정보
-export function RoomInfoModal({ room, madeBy, messageCount, members, meId }: Props) {
+export function RoomInfoModal({ room, madeBy, messageCount, members, meId, onProfile, onClose }: Props) {
+  const sub = [madeBy, messageCount !== undefined ? `메시지 ${messageCount}개` : '', room.landing ? '처음 방' : ''].filter(Boolean).join(' · ')
   return (
-    <Modal>
+    <Modal onClose={onClose}>
       <div className="modal-head">
         <Mark label={room.name.slice(0, 1)} color={roomColor(room.name)} size="md" />
         <div className="grow col" style={{ gap: 2 }}>
           <span className="disp" style={{ fontSize: 22 }}>{room.name}</span>
-          <span className="hint">{madeBy} · 메시지 {messageCount}개{room.landing ? ' · 처음 방' : ''}</span>
+          {sub && <span className="hint">{sub}</span>}
         </div>
-        <CloseButton />
+        <CloseButton onClick={onClose} />
       </div>
 
       <span className="lbl">
@@ -30,10 +33,10 @@ export function RoomInfoModal({ room, madeBy, messageCount, members, meId }: Pro
       </span>
       <div className="col scroll" style={{ gap: 2, maxHeight: 340 }}>
         {members.map((m) => (
-          <button key={m.id} type="button" className="pitem">
-            <Avatar name={m.nick} color={m.color} size={30} />
+          <button key={m.id} type="button" className="pitem" onClick={onProfile && (() => onProfile(m.id))}>
+            <Avatar name={m.nick} color={m.color} size={30} src={m.src} />
             <span className="pitem-name">{m.nick}{m.id === meId ? ' (나)' : ''}</span>
-            <span className="pitem-sub">{m.dnd ? '방해 금지' : m.online ? '접속 중' : ''}</span>
+            <span className="pitem-sub">{m.dnd ? '방해 금지' : m.online ? '접속 중' : m.via ?? ''}</span>
           </button>
         ))}
       </div>

@@ -1,10 +1,10 @@
 // 작은 입력 부품: 토글, 세그먼트(하나 고르기), 숫자 칸
 
-type ToggleProps = { on: boolean; label: string }
+type ToggleProps = { on: boolean; label: string; disabled?: boolean; onChange?: (on: boolean) => void }
 
-export function Toggle({ on, label }: ToggleProps) {
+export function Toggle({ on, label, disabled, onChange }: ToggleProps) {
   return (
-    <button type="button" className={`tgl${on ? ' on' : ''}`} aria-pressed={on} aria-label={label}>
+    <button type="button" className={`tgl${on ? ' on' : ''}`} aria-pressed={on} aria-label={label} disabled={disabled} onClick={onChange && (() => onChange(!on))}>
       <span />
     </button>
   )

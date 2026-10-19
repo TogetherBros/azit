@@ -63,3 +63,9 @@ img { display: block; max-width: 100%; }
   .shake, .hl { animation: none; }
   .btn { transition: none; }
 }
+
+/* 앱 설정 → 화면 (lib/prefs.ts 가 <html> 에 단다) */
+.reduce-motion .shake, .reduce-motion .hl { animation: none; }
+.reduce-motion .btn { transition: none; }
+html.fs-s .bub { font-size: 13px; }
+html.fs-l .bub { font-size: 17px; }

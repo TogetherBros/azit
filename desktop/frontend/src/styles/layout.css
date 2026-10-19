@@ -61,6 +61,7 @@
 .side-azit { display: flex; align-items: flex-start; gap: 10px; }
 .side-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; margin: -4px 0 -2px -6px; padding: 4px 8px 4px 4px; border-radius: 10px; font-size: 12px; font-weight: 800; color: var(--mu); }
 .side-back:hover { background: var(--s2); color: var(--tx); }
+.side-back-badge { display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; padding: 1px 6px; border-radius: 9px; background: var(--pink); color: var(--on-accent); font-size: 11px; font-weight: 800; }
 .side-azit-name { font-family: var(--font-disp); font-size: 15px; line-height: 1.3; word-break: keep-all; overflow-wrap: anywhere; }
 .side-azit-meta { font-size: 11px; font-weight: 800; color: var(--mu); }
 

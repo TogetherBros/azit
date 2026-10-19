@@ -19,6 +19,8 @@ export type AzitRes = {
   description: string // 한 줄 소개
   banner_url: string
   member_count: number
+  online_count: number // 지금 앱을 켜 둔 멤버 수
+  unread: number // 모든 방 안 읽은 메시지 수 합
   my_role: Role | ''
   my_nickname: string
 }
@@ -42,7 +44,7 @@ export type InvitePreview = {
 
 export type ExpiresIn = '30m' | '1h' | '1d' | '7d' | 'never'
 
-export type RoomRes = { room_id: number; azit_id: number; name: string; position: number; unread: number }
+export type RoomRes = { room_id: number; azit_id: number; name: string; position: number; unread: number; is_default?: boolean } // is_default: 아지트 만들 때 생긴 기본 방 (못 지운다)
 
 export type SenderRes = { account_id: number; nickname: string; color: string; avatar_url: string }
 
@@ -77,6 +79,7 @@ export type ReactItem = { text: string; meme_id: number }
 
 export type MemberRes = {
   account_id: number; name: string; nickname: string; color: string; avatar_url: string; banner_url: string; bio: string; role: Role; joined_at: string
+  online: boolean // 지금 앱을 켜 두었는지
 }
 
 export type NotificationRes = {
@@ -100,6 +103,8 @@ export const listNotifications = () =>
   call<{ notifications: NotificationRes[]; unread: number }>('GET', '/v1/notifications')
 
 export const readAllNotifications = () => call<null>('POST', '/v1/notifications/read-all')
+
+export const readNotification = (id: number) => call<null>('POST', `/v1/notifications/${id}/read`)
 
 /* ---------- 아지트 · 초대 ---------- */
 
@@ -134,6 +139,9 @@ export const createRoom = (azitId: number, name: string) => call<RoomRes>('POST'
 export const renameRoom = (azitId: number, roomId: number, name: string) =>
   call<RoomRes>('PATCH', `/v1/azits/${azitId}/rooms/${roomId}`, { name })
 
+// 관리자 이상. 메시지는 남고 방만 숨는다 (변경 기록에서 되돌리기). 마지막 방은 못 지운다
+export const deleteRoom = (azitId: number, roomId: number) => call<null>('DELETE', `/v1/azits/${azitId}/rooms/${roomId}`)
+
 export const reorderRooms = (azitId: number, roomIds: number[]) =>
   call<RoomRes[]>('PUT', `/v1/azits/${azitId}/rooms/order`, { room_ids: roomIds })
 
@@ -151,6 +159,7 @@ export type SendInput = {
   meme_id?: number
   shake_ids?: number[]
   shake_all?: boolean
+  reply_to_id?: number // 답장이면 원래 메시지 id
 }
 
 export const sendMessage = (azitId: number, roomId: number, input: SendInput) =>
@@ -184,7 +193,37 @@ export const leaveAzit = (azitId: number) => call<null>('DELETE', `/v1/azits/${a
 export const updateMemberRole = (azitId: number, accountId: number, role: 'admin' | 'member') =>
   call<MemberRes>('PATCH', `/v1/azits/${azitId}/members/${accountId}/role`, { role })
 
-export const kickMember = (azitId: number, accountId: number) => call<null>('DELETE', `/v1/azits/${azitId}/members/${accountId}`)
+// ban 이면 막기도: 새 초대 코드로도 다시 못 들어온다
+export const kickMember = (azitId: number, accountId: number, ban = false) =>
+  call<null>('DELETE', `/v1/azits/${azitId}/members/${accountId}`, { ban })
+
+export type BanRes = { account_id: number; name: string; nickname: string; banned_by_nickname: string; banned_at: string }
+
+export const listBans = (azitId: number) => call<BanRes[]>('GET', `/v1/azits/${azitId}/bans`)
+
+export const unban = (azitId: number, accountId: number) => call<null>('DELETE', `/v1/azits/${azitId}/bans/${accountId}`)
+
+/* ---------- 변경 기록 ---------- */
+
+export type LogRes = {
+  entry_id: number
+  kind: string // azit.info, room.create, room.rename, room.order, member.role, member.kick, member.unban, meme.create, meme.delete, reacts.update
+  actor_nickname: string
+  summary: string
+  created_at: string
+  undoable: boolean
+  undone_at: string | null
+  undone_by_nickname: string
+}
+
+export const listLog = (azitId: number) => call<LogRes[]>('GET', `/v1/azits/${azitId}/log`)
+
+export const undoLog = (azitId: number, entryId: number) => call<LogRes>('POST', `/v1/azits/${azitId}/log/${entryId}/undo`)
+
+/* ---------- 채팅 사진 → 짤 ---------- */
+
+export const saveMemeFromMessage = (azitId: number, messageId: number, name: string) =>
+  call<MemeRes>('POST', `/v1/azits/${azitId}/memes/from-message`, { message_id: messageId, name })
 
 export const listMemes = (azitId: number) => call<MemeRes[]>('GET', `/v1/azits/${azitId}/memes`)
 

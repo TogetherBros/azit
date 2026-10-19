@@ -82,6 +82,7 @@ type UserBase = {
   edited?: boolean
   pending?: boolean // 보내는 중
   failed?: boolean // 못 보냄 → 다시 보내기
+  reply?: { id?: string; nick: string; text: string } // 답장이면 원래 메시지 (아직 안 불러왔으면 text 가 안내 문구)
 }
 
 export type UserMessage = UserBase & (

@@ -2,6 +2,7 @@
 // 날짜 구분선, 같은 사람 이어 보내기(cont), 묶음 끝 시간(showTime), "여기까지 읽었어요" 선을 여기서 정한다.
 import type { MessageRes, ReactionRes } from '../api/server'
 import type { ChatRow, MessagePart, Reaction, UserMessage } from '../api/types'
+import { getPrefs } from './prefs'
 
 const GROUP_GAP = 5 * 60 * 1000 // 같은 사람이 5분 안에 이어 보내면 한 묶음
 
@@ -20,6 +21,7 @@ export type Outgoing = {
   memeId?: number
   photoKey?: string
   file?: File // 아직 못 올린 사진 (다시 보내기 때 다시 올린다)
+  replyToId?: number // 답장이면 원래 메시지 id
 }
 
 type Content = { kind: 'text'; parts: MessagePart[] } | { kind: 'image'; src: string } | { kind: 'sticker'; src: string; name: string }
@@ -48,6 +50,15 @@ export function toRows(messages: MessageRes[], outgoing: Outgoing[], me: Me, las
     return out
   }
 
+  // 답장 인용: 불러온 메시지에서 원래 것을 찾는다 (더 위라 아직 안 불러왔으면 안내 문구)
+  const byId = new Map(messages.map((m) => [m.message_id, m]))
+  const quote = (id: number | null | undefined) => {
+    if (!id) return undefined
+    const o = byId.get(id)
+    if (!o) return { id: String(id), nick: '이전 메시지', text: '눌러서 불러오기' }
+    return { id: String(id), nick: o.sender?.nickname ?? '알 수 없음', text: preview(o) }
+  }
+
   for (const m of messages) {
     if (m.kind === 'system' || !m.sender) continue
     const mine = m.sender.account_id === me.id
@@ -65,6 +76,7 @@ export function toRows(messages: MessageRes[], outgoing: Outgoing[], me: Me, las
         edited: !!m.edited_at && !m.deleted,
         shookMe: !mine && (m.shake_all || m.shake_ids.includes(me.id)),
         reactions: m.reactions.map(toReaction),
+        reply: quote(m.reply_to_id),
       },
     })
   }
@@ -85,6 +97,7 @@ export function toRows(messages: MessageRes[], outgoing: Outgoing[], me: Me, las
         mine: true,
         pending: !o.failed,
         failed: o.failed,
+        reply: quote(o.replyToId),
       },
     })
   }
@@ -110,6 +123,14 @@ export function toRows(messages: MessageRes[], outgoing: Outgoing[], me: Me, las
     rows.push({ type: 'msg', msg: { ...it.msg, time: clock(it.at) }, cont, showTime: endsGroup })
   }
   return rows
+}
+
+// 메시지 한 줄 요약 (답장 인용, 답장 쓰는 중 표시)
+export function preview(m: MessageRes): string {
+  if (m.deleted) return '지운 메시지'
+  if (m.kind === 'photo') return '사진'
+  if (m.kind === 'meme') return '짤'
+  return m.body.replace(/\s+/g, ' ').slice(0, 80)
 }
 
 function toReaction(r: ReactionRes): Reaction {
@@ -149,10 +170,11 @@ function dayLabel(d: Date): string {
   return `${y}${d.getMonth() + 1}월 ${d.getDate()}일 ${DAYS[d.getDay()]}요일`
 }
 
-// "오후 2:05"
+// "오후 2:05" (앱 설정에서 24시간을 고르면 "14:05")
 export function clock(d: Date): string {
   const h = d.getHours()
   const m = String(d.getMinutes()).padStart(2, '0')
+  if (getPrefs().clock === '24') return `${String(h).padStart(2, '0')}:${m}`
   return `${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${m}`
 }
 

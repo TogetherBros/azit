@@ -130,7 +130,7 @@ export const CHAT_ROWS: ChatRow[] = [
   },
   {
     type: 'msg',
-    msg: { kind: 'text', id: 'm3', author: RYU, parts: [{ text: '이거 봐라 ㅋㅋㅋ' }], time: '오후 2:05' },
+    msg: { kind: 'text', id: 'm3', author: RYU, parts: [{ text: '이거 봐라 ㅋㅋㅋ' }], time: '오후 2:05', reply: { id: 'm1', nick: '강백호', text: '오늘 마크 서버 열림?' } },
   },
   {
     type: 'msg',

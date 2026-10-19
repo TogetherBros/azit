@@ -2,7 +2,7 @@
 export type IconName =
   | 'shake' | 'search' | 'plus' | 'gear' | 'bell' | 'send' | 'back'
   | 'x' | 'check' | 'chev' | 'wide' | 'narrow' | 'menu' | 'game' | 'star'
-  | 'min' | 'max' | 'smile' | 'edit' | 'trash'
+  | 'min' | 'max' | 'smile' | 'edit' | 'trash' | 'reply' | 'save'
 
 const PATHS: Partial<Record<IconName, string>> = {
   shake: 'M2 12l3-6 4 12 4-12 4 12 3-6h2',
@@ -21,6 +21,8 @@ const PATHS: Partial<Record<IconName, string>> = {
   max: 'M5 5h14v14H5z',
   edit: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',
   trash: 'M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v5M14 11v5',
+  reply: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 6 6v5',
+  save: 'M12 3v12M7 10l5 5 5-5M5 21h14',
 }
 
 type Props = { name: IconName; size?: number; stroke?: number }

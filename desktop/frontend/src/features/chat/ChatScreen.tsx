@@ -1,17 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  addReaction, deleteMessage, editMessage, errorText, listMessages, markRead, removeReaction, sendMessage, uploadFile,
+  addReaction, deleteMessage, editMessage, errorText, listMessages, markRead, removeReaction, saveMemeFromMessage, sendMessage, uploadFile,
   type MemberRes, type MemeRes, type MessageRes, type SendInput,
 } from '../../api/server'
 import type { Member, ReactOption, Reaction, Room, Sticker, UserMessage } from '../../api/types'
-import { ago, mentionQuery, newTempId, toRows, type Me, type Outgoing } from '../../lib/chat'
+import { ago, mentionQuery, newTempId, preview, toRows, type Me, type Outgoing } from '../../lib/chat'
 import { shrinkImage } from '../../lib/image'
+import { onRealtime, onReconnect } from '../../lib/realtime'
 import { MemberProfileModal } from '../azit/MemberProfileModal'
+import { RoomInfoModal } from '../rooms/RoomInfoModal'
+import { SaveMemeModal } from './SaveMemeModal'
+import { ShakeModal } from './ShakeModal'
 import { DeleteMessageModal, ImageModal } from './ChatModals'
 import { ChatView } from './ChatView'
 import type { ComposerPopup } from './Composer'
 
-const POLL_MS = 3000 // 웹소켓 전까지는 3초마다 새 메시지를 물어본다
+const ROLE_TAG = { super_admin: '만든 사람', admin: '관리자', member: '' } as const
+
+// 사람 고르는 목록의 둘째 줄: "접속 중 · @name"
+const sub = (m: MemberRes) => [m.online && '접속 중', m.name && `@${m.name}`].filter(Boolean).join(' · ')
+
+const POLL_MS = 30000 // 새 메시지는 실시간(웹소켓)으로 온다. 이건 혹시 놓친 걸 메우는 느린 확인
 
 type Props = {
   azitId: number
@@ -24,10 +33,11 @@ type Props = {
   canDeleteOthers: boolean // 관리자
   onRead?: () => void // 읽음 처리했으니 방 목록 안 읽은 수를 다시 받으라고
   onShaken?: () => void // 나를 흔든 새 메시지가 왔다
+  onMemeSaved?: () => void // 채팅 사진을 짤로 저장했으니 짤 목록을 다시 받으라고
 }
 
 // 방 하나의 채팅. 서버에서 메시지를 받아 ChatView 에 넘기고, 보내기·고치기·지우기·맞장구를 처리한다.
-export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes, members, canDeleteOthers, onRead, onShaken }: Props) {
+export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes, members, canDeleteOthers, onRead, onShaken, onMemeSaved }: Props) {
   const roomId = Number(room.id)
   const [messages, setMessages] = useState<MessageRes[]>([])
   const [hasMore, setHasMore] = useState(false)
@@ -36,6 +46,7 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes,
   const [outgoing, setOutgoing] = useState<Outgoing[]>([])
   const [draft, setDraft] = useState('')
   const [editing, setEditing] = useState<UserMessage>()
+  const [replyTo, setReplyTo] = useState<number>() // 답장할 메시지 id
   const [error, setError] = useState<string>()
   const readSent = useRef(0)
   const seen = useRef(0) // 흔들기 알림을 이미 확인한 마지막 메시지 id
@@ -52,7 +63,7 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes,
   // 방을 바꾸면 처음부터
   useEffect(() => {
     let stop = false
-    setMessages([]); setOutgoing([]); setHasMore(false); setEditing(undefined); setDraft(''); setError(undefined)
+    setMessages([]); setOutgoing([]); setHasMore(false); setEditing(undefined); setReplyTo(undefined); setDraft(''); setError(undefined)
     readSent.current = 0
     seen.current = Number.MAX_SAFE_INTEGER // 처음 불러온 메시지로는 흔들지 않는다
 
@@ -81,6 +92,20 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes,
       }
     }, POLL_MS)
     return () => { stop = true; window.clearInterval(timer) }
+  }, [azitId, roomId, merge])
+
+  // 실시간: 이 방의 새 메시지는 바로 붙이고, 고침·지움·맞장구면 최신 목록을 다시 받는다.
+  // 다시 연결됐을 때도 다시 받는다 (끊겨 있던 사이 놓친 것 메우기).
+  useEffect(() => {
+    const refresh = () => {
+      listMessages(azitId, roomId).then((res) => merge(res.messages)).catch(() => {})
+    }
+    const offEvent = onRealtime((e) => {
+      if (e.type === 'message.created' && e.data.room_id === roomId) merge([e.data])
+      if (e.type === 'message.updated' && e.data.room_id === roomId) refresh()
+    })
+    const offOpen = onReconnect(refresh)
+    return () => { offEvent(); offOpen() }
   }, [azitId, roomId, merge])
 
   // 새로 온 메시지에 내가 흔들렸으면 알린다
@@ -135,6 +160,7 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes,
       } else {
         input = { temp_id: o.tempId, body: o.body, shake_ids: o.shakeIds, shake_all: o.shakeAll }
       }
+      if (o.replyToId) input.reply_to_id = o.replyToId
       const m = await sendMessage(azitId, roomId, input)
       merge([m])
       setOutgoing((os) => os.filter((x) => x.tempId !== o.tempId))
@@ -163,7 +189,34 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes,
     setDraft('')
     setPicked([])
     setMention(null)
-    await deliver({ tempId: newTempId(), body, at: Date.now(), shakeIds, shakeAll: body.includes('@전체') })
+    await deliver({ tempId: newTempId(), body, at: Date.now(), shakeIds, shakeAll: body.includes('@전체'), replyToId: takeReply() })
+  }
+
+  // 답장: 다음에 보내는 메시지 하나에 붙이고 비운다
+  const takeReply = () => {
+    const id = replyTo
+    setReplyTo(undefined)
+    return id
+  }
+  const replyMsg = replyTo ? messages.find((m) => m.message_id === replyTo) : undefined
+
+  // 채팅 사진 → 아지트 짤 (이름을 물어보는 창)
+  const [saving, setSaving] = useState<number>()
+  const [saveBusy, setSaveBusy] = useState(false)
+  const [saveError, setSaveError] = useState<string>()
+  const saveMeme = async (name: string) => {
+    if (!saving) return
+    setSaveBusy(true)
+    try {
+      await saveMemeFromMessage(azitId, saving, name)
+      setSaving(undefined)
+      setSaveError(undefined)
+      onMemeSaved?.()
+    } catch (e) {
+      setSaveError(errorText(e))
+    } finally {
+      setSaveBusy(false)
+    }
   }
 
   // @ 부르기 (= 흔들기). "@검색어" 를 치면 후보가 뜨고, 고르면 "@닉네임 " 으로 바꾸고 그 사람 id 를 기억한다
@@ -180,7 +233,7 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes,
     const people = members
       .filter((m) => m.account_id !== me.id)
       .filter((m) => !q || m.nickname.toLowerCase().includes(q) || m.name.toLowerCase().includes(q))
-      .map((m) => ({ id: String(m.account_id), accountId: m.account_id, nick: m.nickname, color: m.color, src: m.avatar_url || undefined, via: m.name ? `@${m.name}` : '' }))
+      .map((m) => ({ id: String(m.account_id), accountId: m.account_id, nick: m.nickname, color: m.color, src: m.avatar_url || undefined, via: sub(m) }))
     return ('전체'.includes(q) ? [all, ...people] : people).slice(0, 8)
   }, [mention, members, me.id])
 
@@ -207,6 +260,8 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes,
   const [popup, setPopup] = useState<ComposerPopup>(null)
   const [viewing, setViewing] = useState<string>() // 크게 보는 사진
   const [profileId, setProfileId] = useState<number>() // 프로필 창을 띄운 멤버
+  const [roomInfo, setRoomInfo] = useState(false) // 방 정보 창
+  const [shaking, setShaking] = useState(false) // + → 흔들기 (사람 고르기 창)
   const profile = members.find((m) => m.account_id === profileId) // 나간 사람이면 없어서 안 뜬다
 
   const stickers: Sticker[] = useMemo(
@@ -224,13 +279,13 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes,
     const m = memes.find((x) => String(x.meme_id) === id)
     if (!m) return
     setPopup(null)
-    void deliver({ tempId: newTempId(), body: '', at: Date.now(), kind: 'meme', memeId: m.meme_id, src: m.url, name: m.name })
+    void deliver({ tempId: newTempId(), body: '', at: Date.now(), kind: 'meme', memeId: m.meme_id, src: m.url, name: m.name, replyToId: takeReply() })
   }
 
   const sendPhoto = (file: File) => {
     setPopup(null)
     if (file.size > 30 << 20) { setError('사진이 너무 커요'); return } // 줄이기 전 원본. 줄인 뒤 10MB 는 서버가 본다
-    void deliver({ tempId: newTempId(), body: '', at: Date.now(), kind: 'photo', file, src: URL.createObjectURL(file) })
+    void deliver({ tempId: newTempId(), body: '', at: Date.now(), kind: 'photo', file, src: URL.createObjectURL(file), replyToId: takeReply() })
   }
 
   const retry = (msg: UserMessage) => {
@@ -280,7 +335,34 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes,
     }
   }
 
+  // 답장 인용 누르기 → 원래 메시지로. 아직 안 불러왔으면 위로 한 묶음씩 더 불러오며 찾는다 (최대 20번 = 1000개)
+  const [jump, setJump] = useState<{ id: string; n: number }>()
+  const jumpTo = async (id: string) => {
+    const target = Number(id)
+    const go = () => setJump((j) => ({ id, n: (j?.n ?? 0) + 1 }))
+    if (messages.some((m) => m.message_id === target)) { go(); return }
+    let oldest = messages[0]?.message_id
+    if (!oldest) return
+    setLoadingMore(true)
+    try {
+      for (let i = 0; i < 20; i++) {
+        const res = await listMessages(azitId, roomId, oldest)
+        merge(res.messages)
+        setHasMore(res.has_more)
+        if (res.messages.some((m) => m.message_id === target)) { go(); return }
+        if (!res.has_more || res.messages.length === 0) break
+        oldest = Math.min(...res.messages.map((m) => m.message_id))
+      }
+      setError('원래 메시지를 찾지 못했어요')
+    } catch (e) {
+      setError(errorText(e))
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
   const onEdit = (msg: UserMessage) => {
+    setReplyTo(undefined)
     setEditing(msg)
     setDraft(msg.kind === 'text' ? msg.parts.map((p) => ('text' in p ? p.text : `@${p.mention}`)).join('') : '')
   }
@@ -305,8 +387,13 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes,
       onRetry={retry}
       onImage={setViewing}
       onProfile={(id) => setProfileId(Number(id))}
+      onRoomInfo={() => setRoomInfo(true)}
       memeOptions={memeOptions}
       canDelete={canDeleteOthers}
+      onReply={(msg) => { setEditing(undefined); setReplyTo(Number(msg.id)) }}
+      onSaveMeme={(msg) => { setSaveError(undefined); setSaving(Number(msg.id)) }}
+      onJump={(id) => void jumpTo(id)}
+      jumpTo={jump}
       composer={{
         value: draft,
         editing: !!editing,
@@ -319,14 +406,38 @@ export function ChatScreen({ azitId, room, memberCount, me, reactOptions, memes,
         onMentionPick: pickMention,
         onSend: () => void send(),
         onCancelEdit: () => { setEditing(undefined); setDraft('') },
+        replying: replyMsg && { nick: replyMsg.sender?.nickname ?? '알 수 없음', text: preview(replyMsg) },
+        onCancelReply: () => setReplyTo(undefined),
         onPlus: () => { setMention(null); setPopup(popup ? null : 'plus') },
         onPopup: (p) => { if (mention) setMention(null); else setPopup(p) },
         onSticker: sendMeme,
         onPhoto: sendPhoto,
+        onShake: () => { setPopup(null); setShaking(true) },
       }}
     />
     {deleting && <DeleteMessageModal busy={deleteBusy} onCancel={() => setDeleting(undefined)} onConfirm={() => void confirmDelete()} />}
+    {saving && <SaveMemeModal busy={saveBusy} error={saveError} onCancel={() => setSaving(undefined)} onSave={(name) => void saveMeme(name)} />}
     {viewing && <ImageModal src={viewing} onClose={() => setViewing(undefined)} />}
+    {shaking && (
+      <ShakeModal
+        members={members.filter((m) => m.account_id !== me.id).map((m) => ({ id: String(m.account_id), nick: m.nickname, color: m.color, src: m.avatar_url || undefined, via: sub(m) }))}
+        onPick={(id) => {
+          const m = members.find((x) => String(x.account_id) === id)
+          setShaking(false)
+          if (m) void deliver({ tempId: newTempId(), body: `@${m.nickname}`, at: Date.now(), shakeIds: [m.account_id] })
+        }}
+        onClose={() => setShaking(false)}
+      />
+    )}
+    {roomInfo && (
+      <RoomInfoModal
+        room={room}
+        members={members.map((m) => ({ id: String(m.account_id), nick: m.nickname, color: m.color, src: m.avatar_url || undefined, via: [m.online && '접속 중', ROLE_TAG[m.role]].filter(Boolean).join(' · ') }))}
+        meId={String(me.id)}
+        onProfile={(id) => { setRoomInfo(false); setProfileId(Number(id)) }}
+        onClose={() => setRoomInfo(false)}
+      />
+    )}
     {profile && <MemberProfileModal member={profile} self={profile.account_id === me.id} onClose={() => setProfileId(undefined)} />}
     </>
   )

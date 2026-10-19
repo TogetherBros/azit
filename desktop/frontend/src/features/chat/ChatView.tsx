@@ -1,10 +1,10 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { ChatRow, ReactOption, Room } from '../../api/types'
 import { Icon } from '../../components/Icon'
 import { Composer } from './Composer'
 import { MessageItem } from './MessageItem'
 
-type ItemHandlers = Pick<Parameters<typeof MessageItem>[0], 'onReact' | 'onToggle' | 'onEdit' | 'onDelete' | 'onRetry' | 'onImage' | 'onProfile' | 'canDelete' | 'memeOptions'>
+type ItemHandlers = Pick<Parameters<typeof MessageItem>[0], 'onReact' | 'onToggle' | 'onEdit' | 'onDelete' | 'onRetry' | 'onImage' | 'onProfile' | 'canDelete' | 'memeOptions' | 'onReply' | 'onSaveMeme' | 'onJump'>
 
 type Props = {
   room: Room
@@ -18,11 +18,13 @@ type Props = {
   loadingMore?: boolean
   error?: string
   onMore?: () => void
+  onRoomInfo?: () => void // 머리의 "N명" 누르기 → 방 정보
+  jumpTo?: { id: string; n: number } // 이 메시지로 스크롤하고 잠깐 반짝 (n 은 같은 메시지를 또 눌러도 다시 하려고)
 } & ItemHandlers
 
 // 오른쪽 본문: 머리(방 이름 · N명) · 메시지 목록 · 입력창
 // 새 메시지가 오면 맨 아래에 있을 때만 따라 내려간다. 위로 더 불러오면 보던 자리를 지킨다.
-export function ChatView({ room, memberCount, rows, reactOptions, mini, reconnecting, composer, hasMore, loadingMore, error, onMore, ...item }: Props) {
+export function ChatView({ room, memberCount, rows, reactOptions, mini, reconnecting, composer, hasMore, loadingMore, error, onMore, onRoomInfo, jumpTo, ...item }: Props) {
   const body = useRef<HTMLDivElement>(null)
   const last = useRef({ first: '', last: '', height: 0, atBottom: true, room: '' })
 
@@ -52,6 +54,19 @@ export function ChatView({ room, memberCount, rows, reactOptions, mini, reconnec
     last.current = { first, last: lastKey, height: el.scrollHeight, atBottom: prev.room !== room.id || prev.atBottom, room: room.id }
   }, [rows, room.id])
 
+  // 답장 인용을 누르면 원래 메시지로 (위로 불러온 뒤 위치 지키기가 끝난 다음에 돈다)
+  useEffect(() => {
+    if (!jumpTo) return
+    const el = body.current?.querySelector<HTMLElement>(`[data-msg-id="${CSS.escape(jumpTo.id)}"]`)
+    if (!el) return
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    el.classList.remove('flash')
+    void el.offsetWidth // 같은 메시지를 또 눌러도 애니메이션이 다시 돌게
+    el.classList.add('flash')
+    const t = window.setTimeout(() => el.classList.remove('flash'), 1600)
+    return () => window.clearTimeout(t)
+  }, [jumpTo])
+
   return (
     <div className="main">
       <header className="head">
@@ -62,7 +77,7 @@ export function ChatView({ room, memberCount, rows, reactOptions, mini, reconnec
         )}
         <h1 className="ell head-title">{room.name}</h1>
         <span className="grow">
-          <button type="button" className="btn s sec" aria-label={`방 정보 · ${memberCount}명`}>{memberCount}명</button>
+          <button type="button" className="btn s sec" aria-label={`방 정보 · ${memberCount}명`} onClick={onRoomInfo}>{memberCount}명</button>
         </span>
         {mini && (
           <button type="button" className="btn s icon sec" aria-label="크게 보기" title="크게 보기">

@@ -386,3 +386,5 @@
 .room-move.down svg { transform: rotate(90deg); }
 .meme-new { gap: 12px; align-items: flex-end; }
 .meme-new img { width: 64px; height: 64px; object-fit: contain; border-radius: 12px; background: var(--bg); }
+.online-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--lime); vertical-align: 1px; }
+.member-online-count { font-size: 13px; font-weight: 700; color: var(--lime); }

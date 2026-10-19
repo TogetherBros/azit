@@ -18,10 +18,13 @@ type Props = {
   onImage?: (src: string) => void // 사진 크게 보기
   onProfile?: (accountId: string) => void // 아바타·이름 누르기 → 프로필
   canDelete?: boolean // 남의 메시지도 지울 수 있는지 (관리자)
+  onReply?: (msg: UserMessage) => void // 답장
+  onSaveMeme?: (msg: UserMessage) => void // 채팅 사진·짤을 아지트 짤로 저장
+  onJump?: (messageId: string) => void // 답장 인용 누르기 → 원래 메시지로
 }
 
 // 메시지 한 줄. 시스템 메시지(입장, 흔들기 알림)는 가운데 알약 모양.
-export function MessageItem({ msg, cont, showTime, reactOptions, memeOptions = [], onReact, onToggle, onEdit, onDelete, onRetry, onImage, onProfile, canDelete }: Props) {
+export function MessageItem({ msg, cont, showTime, reactOptions, memeOptions = [], onReact, onToggle, onEdit, onDelete, onRetry, onImage, onProfile, canDelete, onReply, onSaveMeme, onJump }: Props) {
   const [picker, setPicker] = useState<HTMLElement | null>(null) // 열린 맞장구 고르기 창의 기준 버튼
   const closePicker = useCallback(() => setPicker(null), [])
 
@@ -44,7 +47,7 @@ export function MessageItem({ msg, cont, showTime, reactOptions, memeOptions = [
   }
 
   return (
-    <div className={`msg${mine ? ' me' : ''}${msg.pending ? ' pending' : ''}`}>
+    <div className={`msg${mine ? ' me' : ''}${msg.pending ? ' pending' : ''}`} data-msg-id={msg.id}>
       {!mine && (cont
         ? <span className="msg-av-gap" />
         : (
@@ -59,6 +62,19 @@ export function MessageItem({ msg, cont, showTime, reactOptions, memeOptions = [
             <button type="button" className="plain" onClick={onProfile && (() => onProfile(author.id))}>{author.nick}</button>
             {author.title && <span className="msg-title">{author.title}</span>}
           </span>
+        )}
+
+        {msg.reply && (
+          <button
+            type="button"
+            className="plain msg-quote"
+            aria-label={`${msg.reply.nick}의 원래 메시지로 가기`}
+            disabled={!onJump || !msg.reply.id}
+            onClick={() => msg.reply?.id && onJump?.(msg.reply.id)}
+          >
+            <span className="msg-quote-nick">{msg.reply.nick}에게 답장</span>
+            <span className="msg-quote-text">{msg.reply.text}</span>
+          </button>
         )}
 
         <div className="msg-line">
@@ -102,6 +118,16 @@ export function MessageItem({ msg, cont, showTime, reactOptions, memeOptions = [
           {canReact && (
             <button type="button" className="ic" aria-label="맞장구" title="맞장구" aria-expanded={!!picker} onClick={togglePicker}>
               <Icon name="smile" size={17} />
+            </button>
+          )}
+          {onReply && (msg.kind === 'text' || msg.kind === 'image' || msg.kind === 'sticker') && (
+            <button type="button" className="ic" aria-label="답장" title="답장" onClick={() => onReply(msg)}>
+              <Icon name="reply" size={16} />
+            </button>
+          )}
+          {onSaveMeme && msg.kind === 'image' && (
+            <button type="button" className="ic" aria-label="짤로 저장" title="짤로 저장" onClick={() => onSaveMeme(msg)}>
+              <Icon name="save" size={16} />
             </button>
           )}
           {mine && onEdit && msg.kind === 'text' && (

@@ -4,12 +4,16 @@ import {
   type ImageKind, type Me, type ProfileFields,
 } from '../../api/profile'
 import {
-  createAzit, errorText, joinInvite, listAzits, listNotifications, previewInvite, readAllNotifications,
+  createAzit, errorText, joinInvite, listAzits, listNotifications, previewInvite, readAllNotifications, readNotification,
   type AzitRes, type InvitePreview, type NotificationRes,
 } from '../../api/server'
 import type { Notification } from '../../api/types'
 import { ago } from '../../lib/chat'
+import { onRealtime, onReconnect } from '../../lib/realtime'
+import { getPrefs, setPrefs, type AppPrefs } from '../../lib/prefs'
+import { autostartState, setAutostart, setCloseToTray } from '../../api/app'
 import { ActivityView } from '../activity/ActivityView'
+import { AppSettingsView, type AppTab } from '../settings/AppSettingsView'
 import { Rail } from '../../app/Rail'
 import { Shell } from '../../app/Shell'
 import { shrinkImage } from '../../lib/image'
@@ -21,10 +25,11 @@ import { MeView } from './MeView'
 
 type Props = { onLogout: () => void }
 
-const NOTIF_POLL_MS = 3000 // 웹소켓 전까지는 3초마다 알림을 물어본다
+const NOTIF_POLL_MS = 30000 // 알림은 실시간으로 온다. 이건 혹시 놓친 걸 메우는 느린 확인
 
 // 창 전체를 흔든다 (base.css 의 .shake). 어느 화면에 있든 같은 자리.
 function shakeWindow() {
+  if (!getPrefs().shakeWindow) return // 앱 설정에서 껐으면 알림만
   const el = document.body
   el.classList.remove('shake')
   void el.offsetWidth // 이어서 흔들려도 애니메이션이 처음부터 다시 돌게
@@ -53,7 +58,7 @@ export function MeScreen({ onLogout }: Props) {
   const [uploadError, setUploadError] = useState<string>()
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string>()
-  const [view, setView] = useState<'home' | 'me' | 'activity' | 'create' | number>('home') // number = 그 아지트 안
+  const [view, setView] = useState<'home' | 'me' | 'activity' | 'settings' | 'create' | number>('home') // number = 그 아지트 안
   const [azits, setAzits] = useState<AzitRes[]>([])
   const [code, setCode] = useState('')
   const [codeError, setCodeError] = useState<string>()
@@ -64,6 +69,41 @@ export function MeScreen({ onLogout }: Props) {
   const [unread, setUnread] = useState(0)
   const [notifError, setNotifError] = useState<string>()
   const [openRoom, setOpenRoom] = useState<number>() // 알림에서 눌러 들어갈 방
+  const [settingsTab, setSettingsTab] = useState<AppTab>('account')
+  const [prefs, setPrefsState] = useState<AppPrefs>(getPrefs)
+  const [autostartOK, setAutostartOK] = useState(false)
+  const [appError, setAppError] = useState<string>()
+
+  // 앱이 켜지면: 트레이 설정을 Go 에 알리고, 자동 실행은 레지스트리 값을 진짜로 본다 (다른 데서 껐을 수도 있으니)
+  useEffect(() => {
+    setCloseToTray(getPrefs().closeToTray)
+    void autostartState().then(({ supported, on }) => {
+      setAutostartOK(supported)
+      if (supported && on !== getPrefs().autostart) {
+        const p = { ...getPrefs(), autostart: on }
+        setPrefs(p)
+        setPrefsState(p)
+      }
+    })
+  }, [])
+
+  const changePrefs = async (p: AppPrefs) => {
+    const before = getPrefs()
+    setPrefs(p)
+    setPrefsState(p)
+    setAppError(undefined)
+    if (p.closeToTray !== before.closeToTray) setCloseToTray(p.closeToTray)
+    if (p.autostart !== before.autostart) {
+      try {
+        await setAutostart(p.autostart)
+      } catch (e) {
+        setAppError(errorText(e))
+        const back = { ...getPrefs(), autostart: before.autostart }
+        setPrefs(back)
+        setPrefsState(back)
+      }
+    }
+  }
   const seenShake = useRef<number | null>(null) // 이미 흔든 마지막 흔들기 알림 id. null = 아직 처음 목록을 안 받음
 
   const load = useCallback(() => {
@@ -105,15 +145,42 @@ export function MeScreen({ onLogout }: Props) {
     return () => window.clearInterval(t)
   }, [ready, loadNotifs])
 
-  // 알림 화면을 열면 다 읽은 걸로
-  const openActivity = () => {
-    setView('activity')
-    if (unread > 0) void readAllNotifications().then(loadNotifs).catch((e) => setNotifError(errorText(e)))
-  }
+  // 실시간: 알림이 오면 바로 목록을 다시 받는다 (새 흔들기면 loadNotifs 가 창을 흔든다).
+  // 누가 들어왔거나 내가 내보내졌으면 아지트 목록도 다시 받고, 내보내진 아지트 안에 있었으면 홈으로 나간다.
+  const viewRef = useRef(view)
+  viewRef.current = view
+  useEffect(() => {
+    if (!ready) return
+    // 새 메시지·접속 변화는 몰려올 수 있어서, 아지트 목록(안 읽은 수·접속 수)은 잠깐 모았다가 한 번만 다시 받는다
+    let pending = 0
+    const soon = () => {
+      if (pending) return
+      pending = window.setTimeout(() => { pending = 0; void loadAzits() }, 800)
+    }
+    const offEvent = onRealtime((e) => {
+      if (e.type === 'message.created' || e.type === 'presence') { soon(); return }
+      if (e.type === 'azit.changed') { if (e.data.what === 'info' || e.data.what === 'members') soon(); return }
+      if (e.type !== 'notification.created') return
+      void loadNotifs().catch(() => {})
+      if (e.data.kind === 'join' || e.data.kind === 'kick') void loadAzits()
+      if (e.data.kind === 'kick' && viewRef.current === e.data.azit_id) setView('home')
+    })
+    const offOpen = onReconnect(() => { void loadNotifs().catch(() => {}); void loadAzits() })
+    return () => { offEvent(); offOpen(); window.clearTimeout(pending) }
+  }, [ready, loadNotifs, loadAzits])
+
+  // 알림 화면은 열기만 한다. 하나씩 누르면 그것만 읽음, "모두 읽음" 버튼은 전부.
+  const openActivity = () => setView('activity')
 
   const openNotif = (id: string) => {
     const n = notifs.find((x) => String(x.notification_id) === id)
-    if (!n || n.kind === 'kick') return // 내보내진 아지트는 못 들어간다
+    if (!n) return
+    if (!n.read) {
+      setNotifs((ns) => ns.map((x) => (x.notification_id === n.notification_id ? { ...x, read: true } : x)))
+      setUnread((u) => Math.max(0, u - 1))
+      void readNotification(n.notification_id).catch((e) => { setNotifError(errorText(e)); void loadNotifs().catch(() => {}) })
+    }
+    if (n.kind === 'kick') return // 내보내진 아지트는 못 들어간다
     enter(n.azit_id, n.room_id || undefined)
   }
 
@@ -238,6 +305,7 @@ export function MeScreen({ onLogout }: Props) {
         key={inside.azit_id}
         azit={inside}
         initialRoomId={openRoom}
+        notifCount={unread}
         me={{ id: me.account_id, nick: inside.my_nickname || me.nickname, color: me.color, src: profile.avatarSrc }}
         onBack={() => { setView('home'); void loadAzits() }}
         onChanged={() => void loadAzits()}
@@ -248,7 +316,7 @@ export function MeScreen({ onLogout }: Props) {
 
   const homeAzits: HomeAzit[] = azits.map((a) => ({
     id: String(a.azit_id), name: a.name, short: shortName(a.name), color: a.color, banner: a.banner_url || undefined,
-    memberCount: a.member_count, unread: 0, online: 0,
+    memberCount: a.member_count, unread: a.unread, online: a.online_count,
   }))
 
   return (
@@ -258,17 +326,31 @@ export function MeScreen({ onLogout }: Props) {
         me={{ id: String(me.account_id), nick: me.nickname, color: me.color }}
         meSrc={profile.avatarSrc}
         notifCount={unread}
-        view={view === 'me' ? 'me' : view === 'activity' ? 'activity' : 'home'}
+        view={view === 'me' ? 'me' : view === 'activity' ? 'activity' : view === 'settings' ? 'settings' : 'home'}
         onHome={() => setView('home')}
         onMe={() => setView('me')}
         onBell={openActivity}
+        onSettings={() => setView('settings')}
         onAzit={(id) => enter(Number(id))}
         onAdd={() => setView('home')}
       />
       {view === 'activity' && (
         <ActivityView items={notifs.map(toNotification)} error={notifError} onReadAll={() => void readAllNotifications().then(loadNotifs).catch((e) => setNotifError(errorText(e)))} onOpen={openNotif} />
       )}
-      {view === 'activity' ? null : view !== 'me'
+      {view === 'settings' && (
+        <AppSettingsView
+          tab={settingsTab}
+          me={profile}
+          prefs={prefs}
+          onTab={setSettingsTab}
+          onPrefs={(p) => void changePrefs(p)}
+          autostartSupported={autostartOK}
+          appError={appError}
+          onEditProfile={() => setView('me')}
+          onLogout={onLogout}
+        />
+      )}
+      {view === 'activity' || view === 'settings' ? null : view !== 'me'
         ? (
           <HomeView
             nickname={me.nickname}

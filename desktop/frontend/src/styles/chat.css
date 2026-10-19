@@ -36,6 +36,17 @@
 .msg-shook { font-size: 11px; font-weight: 800; color: var(--lime); }
 .msg-reacts { display: flex; flex-wrap: wrap; gap: 4px; }
 
+/* 답장: 말풍선 위 원래 메시지 한 줄 */
+.msg-quote { cursor: pointer; text-align: left; display: flex; flex-direction: column; gap: 1px; max-width: 360px; padding: 4px 10px; border-left: 3px solid var(--line2); font-size: 12px; color: var(--mu); }
+.msg.me .msg-quote { border-left: 0; border-right: 3px solid var(--line2); text-align: right; }
+.msg-quote:hover:not(:disabled) { color: var(--tx); }
+.msg-quote:disabled { cursor: default; }
+.msg-quote-nick { font-weight: 800; }
+/* 답장 인용으로 찾아간 메시지 잠깐 반짝 */
+.msg.flash { animation: msg-flash 1.6s ease-out; }
+@keyframes msg-flash { 0%, 30% { background: var(--limebg); } 100% { background: transparent; } }
+.msg-quote-text { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
 /* 말풍선: 남의 것은 왼쪽 위 모서리, 내 것은 오른쪽 위 모서리가 뾰족 */
 .bub {
   max-width: 520px;
@@ -304,6 +315,8 @@ textarea.composer-input { resize: none; }
 /* 진짜 채팅: 보내는 중 · 못 보냄 · 고치는 중 · 더 보기 */
 .msg.pending .bub { opacity: .55; }
 .msg-failed { font-size: 11px; font-weight: 800; color: var(--red); }
+.composer-edit.composer-reply { color: var(--tx); background: var(--line); font-weight: 600; }
+.composer-reply b { color: var(--lime); }
 .composer-edit { gap: 8px; margin-bottom: 8px; padding: 6px 6px 6px 12px; border-radius: 12px; background: var(--limebg); color: var(--lime); font-size: 12px; font-weight: 800; }
 .chat-more { align-self: center; margin: 8px 0; }
 .readline { display: flex; align-items: center; gap: 10px; margin: 6px 20px; font-size: 11px; font-weight: 800; color: var(--pink); }

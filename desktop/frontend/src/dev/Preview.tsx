@@ -78,7 +78,7 @@ function Bare({ view, body, azits = M.AZITS }: { view: 'home' | 'settings' | 'ac
 }
 
 const appSettings = (tab: AppTab, prefs = DEFAULT_PREFS) => () => (
-  <Bare view="settings" body={<AppSettingsView tab={tab} me={M.MY_PROFILE} email="wjdans@gmail.com" prefs={prefs} />} />
+  <Bare view="settings" body={<AppSettingsView tab={tab} me={M.MY_PROFILE} prefs={prefs} />} />
 )
 
 const settings = (tab: SettingsTab, body: ReactNode) => () => (
@@ -162,7 +162,7 @@ const SCREENS: Record<string, () => ReactNode> = {
     <App
       overlay={(
         <MemberProfileModal
-          member={{ account_id: 2, name: 'kangbaekho', nickname: '강백호', color: '#7BC4FF', avatar_url: '', banner_url: '', bio: '점심 내기 무패', role: 'admin', joined_at: '2026-09-20T11:02:00Z' }}
+          member={{ account_id: 2, name: 'kangbaekho', nickname: '강백호', color: '#7BC4FF', avatar_url: '', banner_url: '', bio: '점심 내기 무패', role: 'admin', joined_at: '2026-09-20T11:02:00Z', online: true }}
           onClose={() => {}}
         />
       )}
@@ -201,7 +201,7 @@ const SCREENS: Record<string, () => ReactNode> = {
   'home-code': () => <Bare view="home" body={<HomeView nickname={M.MY_PROFILE.nickname} azits={M.HOME_AZITS} code="MK7Q-2ZAB" codeError="없는 코드예요. 한 글자씩 다시 봐 주세요" />} />,
   'home-empty': () => <Bare view="home" azits={[]} body={<HomeView nickname={M.MY_PROFILE.nickname} azits={[]} />} />,
   'app-account': appSettings('account'),
-  'app-notify': appSettings('notify', { ...DEFAULT_PREFS, notify: 'mention' }),
+  'app-notify': appSettings('notify', { ...DEFAULT_PREFS, shakeWindow: false }),
   'app-look': appSettings('look'),
   'app-look-large': appSettings('look', { ...DEFAULT_PREFS, fontSize: 'l', clock: '24' }),
   'app-app': appSettings('app'),
@@ -232,19 +232,19 @@ const SCREENS: Record<string, () => ReactNode> = {
     <GeneralTab value={{ name: AZ.name, color: AZ.color, desc: AZ.desc ?? '' }} memberCount={AZ.memberCount} dirty error="아지트 이름은 20자까지예요" />
   )),
   'set-codes': settings('codes', <CodesTab codes={M.CODES} made={{ code: 'Q9WE2R', left: '24시간 남음', uses: '5번' }} />),
-  'set-members': settings('members', <MembersTab members={M.MEMBERS.map((m, i) => ({ ...m, name: m.id, role: i === 0 ? 'super_admin' : i === 2 ? 'admin' : 'member' }))} meId={M.ME.id} myRole="super_admin" />),
+  'set-members': settings('members', <MembersTab members={M.MEMBERS.map((m, i) => ({ ...m, name: m.id, role: i === 0 ? 'super_admin' : i === 2 ? 'admin' : 'member' }))} meId={M.ME.id} myRole="super_admin" bans={[{ id: 'b1', name: '도배왕', sub: '@spam · 강백호가 막음 · 2일 전' }]} />),
   'set-rooms': settings('rooms', (
     <RoomsTab rooms={M.ROOMS} archived={['테스트ㅋㅋ']} selectedId="r3" selectedInfo="류승엽이 만듦 · 2주 전 · 메시지 54개" />
   )),
   'set-rooms-landing': settings('rooms', (
-    <RoomsTab rooms={M.ROOMS} archived={[]} selectedId="r1" selectedInfo="4n5rud가 만듦 · 3주 전 · 메시지 128개" />
+    <RoomsTab rooms={M.ROOMS} archived={[]} onDelete={() => {}} selectedId="r1" selectedInfo="4n5rud가 만듦 · 3주 전 · 메시지 128개" />
   )),
   'set-reacts': settings('reacts', <ReactsTab reacts={M.REACT_LIST} draft="실화냐" />),
   'set-reacts-dup': settings('reacts', <ReactsTab reacts={M.REACT_LIST} draft="ㅋㅋ" error="ㅋㅋ는 이미 목록에 있어요" />),
   'set-reacts-full': settings('reacts', <ReactsTab reacts={M.REACT_LIST_FULL} draft="ㄹㅇ" error="10개 꽉 찼어요. 하나 빼고 넣어 주세요" />),
   'set-reacts-member': settings('reacts', <ReactsTab reacts={M.REACT_LIST} draft="" readOnly />),
   'set-stickers': settings('stickers', <StickersTab stickers={M.STICKERS} />),
-  'set-log': settings('log', <LogTab entries={M.LOGS} />),
+  'set-log': settings('log', <LogTab entries={M.LOGS} onUndo={() => {}} />),
   'set-leave': settings('leave', <LeaveTab presses={1} />),
 
   // 작게 보기

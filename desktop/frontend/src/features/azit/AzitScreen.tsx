@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   createInvite, createMeme, createRoom, deleteMeme, errorText, isAdmin, kickMember, leaveAzit, listInvites, listMembers, listMemes,
   listReacts, listRooms, renameRoom, reorderRooms, replaceReacts, revokeInvite, updateAzit, updateMemberRole, updateMyNickname, uploadFile,
-  type AzitPatch, type AzitRes, type InviteRes, type MemberRes, type MemeRes, type ReactItem, type ReactRes, type RoomRes, type Role,
+  deleteRoom, listBans, listLog, undoLog, unban,
+  type AzitPatch, type AzitRes, type BanRes, type InviteRes, type LogRes, type MemberRes, type MemeRes, type ReactItem, type ReactRes, type RoomRes, type Role,
 } from '../../api/server'
-import type { Azit, InviteCode, Member, ReactOption, Room, Sticker } from '../../api/types'
+import type { Azit, InviteCode, LogEntry, LogType, Member, ReactOption, Room, Sticker } from '../../api/types'
 import { Shell } from '../../app/Shell'
 import { ago, left, type Me } from '../../lib/chat'
+import { onRealtime, onReconnect } from '../../lib/realtime'
 import { prepareMeme, shrinkImage } from '../../lib/image'
 import { ChatScreen } from '../chat/ChatScreen'
 import { NewRoomModal } from '../rooms/NewRoomModal'
@@ -15,15 +17,16 @@ import { MemberProfileModal } from './MemberProfileModal'
 import { CodesTab, type CodeExpiry } from './settings/CodesTab'
 import { GeneralTab, type GeneralValues } from './settings/GeneralTab'
 import { LeaveTab } from './settings/LeaveTab'
+import { LogTab } from './settings/LogTab'
 import { MembersTab } from './settings/MembersTab'
 import { ReactsTab } from './settings/ReactsTab'
 import { RoomsTab } from './settings/RoomsTab'
 import { SettingsView, type SettingsTab } from './settings/SettingsView'
 import { StickersTab } from './settings/StickersTab'
 
-const ROOMS_POLL_MS = 5000
+const ROOMS_POLL_MS = 30000 // 변경은 실시간으로 온다. 이건 혹시 놓친 걸 메우는 느린 확인
 // 서버 API 가 있는 설정 탭만 (기본 정보·변경 기록은 아직 없음)
-const TABS: SettingsTab[] = ['general', 'codes', 'members', 'rooms', 'reacts', 'stickers', 'leave']
+const TABS: SettingsTab[] = ['general', 'codes', 'members', 'rooms', 'reacts', 'stickers', 'log', 'leave']
 const ROLE_LABEL = { super_admin: '만든 사람', admin: '관리자', member: '멤버', '': '' } as const
 
 type Props = {
@@ -33,12 +36,13 @@ type Props = {
   onChanged?: () => void // 내 닉네임·인원이 바뀌었다 → 아지트 목록 다시 받기
   onLeft?: () => void // 아지트를 나갔다
   initialRoomId?: number // 처음 열 방 (알림에서 들어올 때). 없거나 이 아지트 방이 아니면 맨 위 방
+  notifCount?: number // 안 읽은 알림 수 ("홈으로" 옆에 보인다)
 }
 
 export const shortName = (name: string) => Array.from(name.trim()).slice(0, 2).join('')
 
 // 아지트 안: 방 목록 + (채팅 | 설정). 방·맞장구 목록·짤은 여기서 받아 아래로 나눠 준다.
-export function AzitScreen({ azit, me, onBack, onChanged, onLeft, initialRoomId }: Props) {
+export function AzitScreen({ azit, me, onBack, onChanged, onLeft, initialRoomId, notifCount }: Props) {
   const azitId = azit.azit_id
   const admin = isAdmin(azit.my_role)
   const [rooms, setRooms] = useState<RoomRes[]>([])
@@ -57,7 +61,7 @@ export function AzitScreen({ azit, me, onBack, onChanged, onLeft, initialRoomId 
       .then((rs) => {
         setRooms(rs)
         const first = rs.some((r) => r.room_id === initialRoomId) ? initialRoomId : rs[0]?.room_id
-        setRoomId((cur) => cur ?? first)
+        setRoomId((cur) => (cur !== undefined && rs.some((r) => r.room_id === cur) ? cur : first)) // 보던 방이 지워졌으면 첫 방으로
       })
       .catch((e) => setError(errorText(e)))
   }, [azitId, initialRoomId])
@@ -70,6 +74,38 @@ export function AzitScreen({ azit, me, onBack, onChanged, onLeft, initialRoomId 
     listMembers(azitId).then(setMembers).catch(() => {})
     const t = window.setInterval(loadRooms, ROOMS_POLL_MS)
     return () => window.clearInterval(t)
+  }, [azitId, loadRooms])
+
+  // 실시간: 이 아지트 방에 새 메시지·변경이 오면 방 목록(안 읽은 수)을 다시 받고,
+  // 누가 들어오면 멤버 목록(@ 후보)을 다시 받는다. 다시 연결됐을 때도 둘 다.
+  const onChangedRef = useRef(onChanged)
+  onChangedRef.current = onChanged
+  const roomIds = useRef(new Set<number>())
+  roomIds.current = new Set(rooms.map((r) => r.room_id))
+  useEffect(() => {
+    const reloadMembers = () => { listMembers(azitId).then(setMembers).catch(() => {}) }
+    const offEvent = onRealtime((e) => {
+      if (e.type === 'message.created' && roomIds.current.has(e.data.room_id)) loadRooms()
+      if (e.type === 'message.updated' && e.data.azit_id === azitId) loadRooms()
+      // 누가 방·짤·맞장구·멤버·정보를 바꿨다 → 그 목록만 다시 받는다
+      if (e.type === 'azit.changed' && e.data.azit_id === azitId) {
+        if (e.data.what === 'rooms') loadRooms()
+        if (e.data.what === 'members') reloadMembers()
+        if (e.data.what === 'memes') listMemes(azitId).then(setMemes).catch(() => {})
+        if (e.data.what === 'reacts') listReacts(azitId).then(setReacts).catch(() => {})
+        if (e.data.what === 'info' || e.data.what === 'members') onChangedRef.current?.() // 이름·색·인원 수는 아지트 목록에서 온다
+      }
+      // 누가 앱을 켜고 껐다 → "접속 중" 표시만 바꾼다
+      if (e.type === 'presence') {
+        setMembers((ms) => ms.map((m) => (m.account_id === e.data.account_id ? { ...m, online: e.data.online } : m)))
+      }
+    })
+    const offOpen = onReconnect(() => {
+      loadRooms(); reloadMembers()
+      listMemes(azitId).then(setMemes).catch(() => {})
+      listReacts(azitId).then(setReacts).catch(() => {})
+    })
+    return () => { offEvent(); offOpen() }
   }, [azitId, loadRooms])
 
 
@@ -118,6 +154,7 @@ export function AzitScreen({ azit, me, onBack, onChanged, onLeft, initialRoomId 
           members={members}
           canDeleteOthers={admin}
           onRead={loadRooms}
+          onMemeSaved={() => void listMemes(azitId).then(setMemes).catch(() => {})}
         />
       )
       : <div className="main"><div className="page mu" style={{ margin: 'auto' }}>{error ?? '방을 불러오는 중…'}</div></div>
@@ -127,14 +164,16 @@ export function AzitScreen({ azit, me, onBack, onChanged, onLeft, initialRoomId 
         {view === 'codes' && <Codes azitId={azitId} meId={me.id} readOnly={!admin} />}
         {view === 'general' && <General key={azitId} azit={azit} readOnly={!admin} onChanged={onChanged} />}
         {view === 'members' && <Members azitId={azitId} meId={me.id} myRole={azit.my_role} onChanged={onChanged} />}
+        {view === 'log' && <Log azitId={azitId} canUndo={admin} />}
         {view === 'leave' && <Leave azitId={azitId} owner={azit.my_role === 'super_admin'} onLeft={onLeft} />}
         {view === 'rooms' && (
           <RoomsSettings
             azitId={azitId}
             rooms={rooms}
+            readOnly={!admin}
             onChanged={setRooms}
             onOpen={openRoom}
-            onNewRoom={() => setNewRoom(true)}
+            onNewRoom={admin ? () => setNewRoom(true) : undefined}
           />
         )}
         {view === 'reacts' && <Reacts azitId={azitId} reacts={reacts} memes={memes} readOnly={!admin} onChanged={setReacts} />}
@@ -165,11 +204,12 @@ export function AzitScreen({ azit, me, onBack, onChanged, onLeft, initialRoomId 
           active={view === 'chat' ? undefined : 'settings'}
           roleLabel={ROLE_LABEL[azit.my_role]}
           noHub
+          notifCount={notifCount}
           onBack={onBack}
           onRoom={openRoom}
           onQuery={setQuery}
           onSettings={() => setView(view === 'chat' ? 'general' : 'chat')}
-          onNewRoom={() => { setError(undefined); setNewRoom(true) }}
+          onNewRoom={admin ? () => { setError(undefined); setNewRoom(true) } : undefined /* 방 만들기는 관리자만 */}
           onInvite={() => setView('codes')}
         />
         {body}
@@ -253,8 +293,20 @@ function Members({ azitId, meId, myRole, onChanged }: { azitId: number; meId: nu
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
 
-  const load = useCallback(() => listMembers(azitId).then(setMembers).catch((e) => setError(errorText(e))), [azitId])
+  const [bans, setBans] = useState<BanRes[]>([])
+  const admin = myRole === 'admin' || myRole === 'super_admin'
+
+  const load = useCallback(async () => {
+    await listMembers(azitId).then(setMembers).catch((e) => setError(errorText(e)))
+    if (admin) await listBans(azitId).then(setBans).catch(() => {})
+  }, [azitId, admin])
   useEffect(() => { void load() }, [load])
+
+  // 다른 사람이 멤버를 바꿨거나(들어옴·내보냄·역할) 누가 앱을 켜고 껐으면 바로 반영
+  useEffect(() => onRealtime((e) => {
+    if (e.type === 'azit.changed' && e.data.azit_id === azitId && e.data.what === 'members') void load()
+    if (e.type === 'presence') setMembers((ms) => ms.map((m) => (m.account_id === e.data.account_id ? { ...m, online: e.data.online } : m)))
+  }), [azitId, load])
 
   // 바꾸고 나면 목록을 다시 받는다 (역할이 바뀌면 순서도 바뀌니까)
   const run = async (f: () => Promise<unknown>) => {
@@ -274,7 +326,7 @@ function Members({ azitId, meId, myRole, onChanged }: { azitId: number; meId: nu
   }
 
   const views: Member[] = members.map((m) => ({
-    id: String(m.account_id), nick: m.nickname, name: m.name, color: m.color, src: m.avatar_url || undefined, role: m.role, joinedAgo: ago(m.joined_at),
+    id: String(m.account_id), nick: m.nickname, name: m.name, color: m.color, src: m.avatar_url || undefined, role: m.role, joinedAgo: ago(m.joined_at), online: m.online,
   }))
   const [profileId, setProfileId] = useState<number>()
   const profile = members.find((m) => m.account_id === profileId)
@@ -289,12 +341,59 @@ function Members({ azitId, meId, myRole, onChanged }: { azitId: number; meId: nu
         error={error}
         onNick={(nick) => run(() => updateMyNickname(azitId, nick))}
         onRole={(id, role) => void run(() => updateMemberRole(azitId, Number(id), role))}
-        onKick={(id) => void run(() => kickMember(azitId, Number(id)))}
+        onKick={(id, ban) => void run(() => kickMember(azitId, Number(id), ban))}
         onProfile={(id) => setProfileId(Number(id))}
+        bans={admin ? bans.map((b) => ({ id: String(b.account_id), name: b.nickname || b.name, sub: `${b.name ? `@${b.name} · ` : ''}${b.banned_by_nickname}가 막음 · ${ago(b.banned_at)}` })) : []}
+        onUnban={(id) => void run(() => unban(azitId, Number(id)))}
       />
       {profile && <MemberProfileModal member={profile} self={profile.account_id === meId} onClose={() => setProfileId(undefined)} />}
     </>
   )
+}
+
+// 서버 기록 종류 → 화면 꼬리표
+const LOG_TYPE: Record<string, LogType> = {
+  'azit.info': '설정', 'room.create': '방', 'room.rename': '방', 'room.order': '방', 'room.delete': '방',
+  'member.role': '멤버', 'member.kick': '멤버', 'member.unban': '멤버',
+  'meme.create': '짤', 'meme.delete': '짤', 'reacts.update': '맞장구',
+}
+
+function Log({ azitId, canUndo }: { azitId: number; canUndo: boolean }) {
+  const [list, setList] = useState<LogRes[]>([])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+
+  const load = useCallback(() => listLog(azitId).then(setList).catch((e) => setError(errorText(e))), [azitId])
+  useEffect(() => { void load() }, [load])
+  // 무엇이 바뀌든 기록이 하나 늘었을 테니 다시 받는다
+  useEffect(() => onRealtime((e) => {
+    if (e.type === 'azit.changed' && e.data.azit_id === azitId) void load()
+  }), [azitId, load])
+
+  const undo = async (id: string) => {
+    setBusy(true)
+    try {
+      await undoLog(azitId, Number(id))
+      setError(undefined)
+      await load()
+    } catch (e) {
+      setError(errorText(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const entries: LogEntry[] = list.map((l) => ({
+    id: String(l.entry_id),
+    ago: ago(l.created_at),
+    by: { id: l.actor_nickname, nick: l.actor_nickname || '누군가', color: 'var(--mu)' },
+    type: LOG_TYPE[l.kind] ?? '설정',
+    text: l.summary,
+    undoable: l.undoable,
+    undoneBy: l.undone_at ? l.undone_by_nickname || '누군가' : undefined,
+  }))
+
+  return <LogTab entries={entries} error={error} busy={busy} onUndo={canUndo ? (id) => void undo(id) : undefined} />
 }
 
 function Leave({ azitId, owner, onLeft }: { azitId: number; owner: boolean; onLeft?: () => void }) {
@@ -387,8 +486,8 @@ function Codes({ azitId, meId, readOnly }: { azitId: number; meId: number; readO
   )
 }
 
-function RoomsSettings({ azitId, rooms, onChanged, onOpen, onNewRoom }: {
-  azitId: number; rooms: RoomRes[]; onChanged: (rs: RoomRes[]) => void; onOpen: (id: string) => void; onNewRoom: () => void
+function RoomsSettings({ azitId, rooms, readOnly, onChanged, onOpen, onNewRoom }: {
+  azitId: number; rooms: RoomRes[]; readOnly: boolean; onChanged: (rs: RoomRes[]) => void; onOpen: (id: string) => void; onNewRoom?: () => void
 }) {
   const [selected, setSelected] = useState<string>(String(rooms[0]?.room_id ?? ''))
   const [busy, setBusy] = useState(false)
@@ -411,6 +510,13 @@ function RoomsSettings({ azitId, rooms, onChanged, onOpen, onNewRoom }: {
     onChanged(rooms.map((x) => (x.room_id === r.room_id ? { ...x, name: r.name } : x)))
   })
 
+  const remove = (id: string) => run(async () => {
+    await deleteRoom(azitId, Number(id))
+    const left = rooms.filter((r) => r.room_id !== Number(id))
+    onChanged(left)
+    setSelected(String(left[0]?.room_id ?? ''))
+  })
+
   const move = (id: string, dir: -1 | 1) => run(async () => {
     const ids = rooms.map((r) => r.room_id)
     const i = ids.indexOf(Number(id))
@@ -425,15 +531,16 @@ function RoomsSettings({ azitId, rooms, onChanged, onOpen, onNewRoom }: {
   if (rooms.length === 0) return <span className="mu">방을 불러오는 중…</span>
   return (
     <RoomsTab
-      rooms={rooms.map((r) => ({ id: String(r.room_id), name: r.name, preview: '', unread: r.unread }))}
+      rooms={rooms.map((r) => ({ id: String(r.room_id), name: r.name, preview: '', unread: r.unread, landing: r.is_default }))}
       selectedId={selected}
       busy={busy}
       error={error}
       onSelect={setSelected}
-      onRename={rename}
-      onMove={move}
+      onRename={readOnly ? undefined : rename /* 이름·순서는 관리자만 (서버도 막는다) */}
+      onMove={readOnly ? undefined : move}
       onOpen={onOpen}
       onNewRoom={onNewRoom}
+      onDelete={readOnly ? undefined : remove}
     />
   )
 }

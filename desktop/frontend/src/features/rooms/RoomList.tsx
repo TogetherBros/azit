@@ -18,17 +18,19 @@ type Props = {
   onQuery?: (q: string) => void
   roleLabel?: string // "모두 주인" 대신 "관리자" 처럼
   noHub?: boolean // 놀이터가 아직 없으면 숨긴다
+  notifCount?: number // 안 읽은 알림 수. 아지트 안엔 레일(종)이 없어서 "홈으로" 옆에 보여 준다
 }
 
 // 아지트 안 왼쪽 칸: ← 홈 · 아지트 이름 · 놀이터 · 방 찾기 · 방 목록 · [+ 방 만들기][초대 코드]
 // 아지트에 들어오면 레일(다른 아지트들)은 숨기고 이 칸만 보인다. 나갈 때는 ← 로 홈.
-export function RoomList({ azit, rooms, currentRoomId, mini, query, active, onBack, onRoom, onSettings, onNewRoom, onInvite, onQuery, roleLabel = '모두 주인', noHub }: Props) {
+export function RoomList({ azit, rooms, currentRoomId, mini, query, active, onBack, onRoom, onSettings, onNewRoom, onInvite, onQuery, roleLabel = '모두 주인', noHub, notifCount = 0 }: Props) {
   return (
     <aside className="side" aria-label="방 목록">
       <div className="side-top">
-        <button type="button" className="plain side-back" onClick={onBack}>
+        <button type="button" className="plain side-back" onClick={onBack} aria-label={`홈으로${notifCount ? ` · 새 알림 ${notifCount}개` : ''}`}>
           <Icon name="back" size={16} />
           홈으로
+          {notifCount > 0 && <span className="side-back-badge"><Icon name="bell" size={11} />{notifCount > 99 ? '99+' : notifCount}</span>}
         </button>
         <div className="side-azit">
           <Mark label={azit.short} color={azit.color} size="sm" />
@@ -96,7 +98,7 @@ export function RoomList({ azit, rooms, currentRoomId, mini, query, active, onBa
       </nav>
 
       <div className="side-foot">
-        <button type="button" className="btn s gh grow" onClick={onNewRoom}>+ 방 만들기</button>
+        {onNewRoom && <button type="button" className="btn s gh grow" onClick={onNewRoom}>+ 방 만들기</button>}
         <button type="button" className="btn s p grow" onClick={onInvite}>초대 코드</button>
       </div>
     </aside>

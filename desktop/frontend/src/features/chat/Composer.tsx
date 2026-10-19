@@ -22,14 +22,17 @@ type Props = {
   onMentionPick?: (i: number) => void // @후보 넣기 (Enter · Tab · 클릭)
   onSend?: () => void
   onCancelEdit?: () => void
+  replying?: { nick: string; text: string } // 답장 쓰는 중이면 원래 메시지
+  onCancelReply?: () => void
   onPlus?: () => void // + 메뉴 열기·닫기
   onPopup?: (p: ComposerPopup) => void // + 메뉴 안에서 다른 창으로 (짤 고르기 등), null 이면 닫기
   onSticker?: (id: string) => void // 짤 하나 보내기
   onPhoto?: (file: File) => void // 고른 사진 보내기
+  onShake?: () => void // + → 흔들기 (사람 고르기 창)
 }
 
-// + 메뉴에서 지금 쓸 수 있는 것 (나머지는 서버가 아직 없음)
-const READY = new Set(['sticker', 'photo'])
+// + 메뉴에서 지금 쓸 수 있는 것 (돌림판·투표·게임은 서버가 아직 없음)
+const READY = new Set(['sticker', 'photo', 'shake'])
 
 // + 메뉴 항목: [키, 이름, 설명, 아이콘 색, 아이콘]
 const PLUS_ITEMS: [string, string, string, 'lime' | 'pink' | 'sky' | 'grape', IconName][] = [
@@ -42,7 +45,7 @@ const PLUS_ITEMS: [string, string, string, 'lime' | 'pink' | 'sky' | 'grape', Ic
 ]
 
 // 입력창은 [+] · 입력칸 · 보내기 세 개뿐. 나머지는 전부 + 안에 (디자인 원칙)
-export function Composer({ draft = '', popup = null, mentionCandidates = [], mentionIndex = 0, stickers = [], liarLive, value, editing, onChange, onMentionMove, onMentionPick, onSend, onCancelEdit, onPlus, onPopup, onSticker, onPhoto }: Props) {
+export function Composer({ draft = '', popup = null, mentionCandidates = [], mentionIndex = 0, stickers = [], liarLive, value, editing, onChange, onMentionMove, onMentionPick, onSend, onCancelEdit, replying, onCancelReply, onPlus, onPopup, onSticker, onPhoto, onShake }: Props) {
   const mentioning = popup === 'mention' && mentionCandidates.length > 0
   const live = onChange !== undefined
   const text = live ? value ?? '' : draft
@@ -51,6 +54,7 @@ export function Composer({ draft = '', popup = null, mentionCandidates = [], men
   const pick = (key: string) => {
     if (key === 'sticker') onPopup?.('sticker')
     if (key === 'photo') photoInput.current?.click()
+    if (key === 'shake') onShake?.()
   }
   return (
     <div className="composer">
@@ -58,6 +62,12 @@ export function Composer({ draft = '', popup = null, mentionCandidates = [], men
         <div className="row composer-edit">
           <span className="grow">메시지 고치는 중 · Enter 로 저장</span>
           <button type="button" className="btn s sec" onClick={onCancelEdit}>취소</button>
+        </div>
+      )}
+      {replying && !editing && (
+        <div className="row composer-edit composer-reply">
+          <span className="grow ell"><b>{replying.nick}</b>에게 답장 · {replying.text}</span>
+          <button type="button" className="btn s sec" onClick={onCancelReply}>취소</button>
         </div>
       )}
       {popup === 'mention' && mentionCandidates.length > 0 && (
@@ -204,6 +214,7 @@ export function Composer({ draft = '', popup = null, mentionCandidates = [], men
                   onSend?.()
                 }
                 if (e.key === 'Escape' && editing) onCancelEdit?.()
+                else if (e.key === 'Escape' && replying) onCancelReply?.()
               }}
             />
           )
