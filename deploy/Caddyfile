@@ -1,0 +1,20 @@
+# Caddy: 서버 앞단 웹서버. HTTPS 인증서(Let's Encrypt)를 알아서 받고 갱신하고,
+# 들어온 요청을 같은 compose 안의 server 컨테이너(8081)로 넘긴다.
+# (Spring 배포 때 앞에 두던 nginx + certbot 역할)
+
+{
+	# 이 EC2 의 80 포트는 다른 컨테이너(위키)가 쓰고 있어서 우리는 443 만 쓴다.
+	# 그래서 http→https 리다이렉트를 끄고, 인증서도 443 으로만 받는다(TLS-ALPN 방식).
+	auto_https disable_redirects
+}
+
+api.togetherbros.uk {
+	tls {
+		issuer acme {
+			disable_http_challenge
+		}
+	}
+
+	encode zstd gzip
+	reverse_proxy server:8081
+}
