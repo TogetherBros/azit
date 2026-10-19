@@ -1,0 +1,126 @@
+# main 에 서버 코드가 들어오면: 테스트 → ARM 이미지 빌드해서 GHCR 에 올림 → 운영 EC2 에서 교체.
+#
+# 필요한 GitHub Secrets (Settings → Secrets and variables → Actions)
+#   서버용: JWT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+#           R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET
+#   접속용: EC2_HOST (api.togetherbros.uk), EC2_SSH_KEY (.pem 내용), EC2_KNOWN_HOSTS (ssh-keyscan 결과)
+
+name: deploy-server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "proto/**"
+      - "deploy/**"
+      - ".dockerignore"
+      - ".github/workflows/deploy-server.yml"
+  workflow_dispatch: # Actions 탭에서 손으로 돌릴 수 있게
+
+# 배포가 두 개 겹쳐 돌지 않게 한 줄로 세운다.
+concurrency:
+  group: deploy-server
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write # GHCR 에 이미지 push
+
+env:
+  IMAGE: ghcr.io/togetherbros/azit-server
+  EC2_USER: ec2-user
+  APP_DIR: /opt/azit
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container: golang:1.27
+    env:
+      GOWORK: "off" # go.work 의 desktop 은 빼고 서버만
+    steps:
+      - uses: actions/checkout@v6
+      - name: go test
+        working-directory: server
+        run: go test ./...
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # 운영 EC2 가 ARM(t4g) 이라 arm64 이미지를 만든다.
+      # Go 는 크로스 컴파일하지만, 마지막 alpine 단계의 apk 설치는 arm64 로 돌아서 에뮬레이터(QEMU)를 켠다.
+      - name: ARM 빌드 준비
+        run: |
+          docker run --privileged --rm tonistiigi/binfmt --install arm64
+          docker buildx create --use
+
+      - name: 이미지 빌드 후 GHCR 에 올리기
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker buildx build \
+            --platform linux/arm64 \
+            -f server/Dockerfile \
+            -t "$IMAGE:$SHA" -t "$IMAGE:latest" \
+            --push .
+
+      - name: SSH 준비
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host ec2\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/id_deploy\n' \
+            "${{ secrets.EC2_HOST }}" "$EC2_USER" > ~/.ssh/config
+
+      - name: compose 파일 복사
+        run: scp deploy/docker-compose.yml deploy/Caddyfile "ec2:$APP_DIR/"
+
+      # 서버 비밀값은 GitHub Secrets 에만 있고, 배포 때마다 server.env 로 덮어쓴다.
+      # 명령줄이 아니라 stdin 으로 넘겨서 로그나 ps 에 안 남는다.
+      - name: server.env 올리기
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          for k in JWT_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET; do
+            printf '%s=%s\n' "$k" "${!k}"
+          done | ssh ec2 "umask 077 && cat > $APP_DIR/server.env"
+
+      - name: 새 이미지로 교체
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          echo "$GHCR_TOKEN" | ssh ec2 "
+            set -e
+            cd $APP_DIR
+            docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+            echo 'AZIT_IMAGE=$IMAGE:$SHA' > .env
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker image prune -f
+          "
+
+      - name: 헬스체크
+        run: |
+          for i in $(seq 1 20); do
+            if curl -fsS "https://${{ secrets.EC2_HOST }}/healthz"; then exit 0; fi
+            sleep 5
+          done
+          echo "healthz 응답 없음"
+          ssh ec2 "cd $APP_DIR && docker compose logs --tail 50"
+          exit 1
