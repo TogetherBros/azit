@@ -64,6 +64,37 @@ export async function shrinkImage(file: File, kind: 'avatar' | 'banner' | 'azit_
   return { contentType: blob.type, base64: await toBase64(blob), size: blob.size }
 }
 
+const MEME_MAX_BYTES = 10 << 20 // 서버 짤 업로드 한도 (storage/key.go 와 같게)
+
+// 짤 올리기 준비. 움직이는 GIF·WebP 는 캔버스로 줄이면 첫 장면만 남아서 그대로 올린다 (10MB 까지).
+// 움직이지 않는 사진은 shrinkImage 로 긴 변 512px 로 줄인다.
+export async function prepareMeme(file: File): Promise<ShrunkImage> {
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  if (isAnimated(file.type, bytes)) {
+    if (bytes.length > MEME_MAX_BYTES) throw new Error('움직이는 짤은 10MB까지 올릴 수 있어요')
+    return { contentType: file.type, base64: bytesToBase64(bytes), size: bytes.length }
+  }
+  return shrinkImage(file, 'meme')
+}
+
+// GIF 는 항상 그대로 (한 장짜리 GIF 도 줄일 이득이 적다). WebP 는 RIFF 안에 ANIM 조각이 있으면 움직이는 것.
+function isAnimated(type: string, b: Uint8Array): boolean {
+  if (type === 'image/gif') return true
+  if (type !== 'image/webp' || b.length < 16) return false
+  const ascii = (i: number, n: number) => String.fromCharCode(...b.subarray(i, i + n))
+  if (ascii(0, 4) !== 'RIFF' || ascii(8, 4) !== 'WEBP') return false
+  // VP8X 머리의 flags 에 애니메이션 비트(0x02)가 있다
+  return ascii(12, 4) === 'VP8X' && b.length > 20 && (b[20] & 0x02) !== 0
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let bin = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  }
+  return btoa(bin)
+}
+
 function toBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob | null> {
   return new Promise((ok) => canvas.toBlob(ok, type, 0.9))
 }
@@ -79,10 +110,5 @@ function loadImage(file: File): Promise<HTMLImageElement> {
 }
 
 async function toBase64(blob: Blob): Promise<string> {
-  const bytes = new Uint8Array(await blob.arrayBuffer())
-  let bin = ''
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
-  }
-  return btoa(bin)
+  return bytesToBase64(new Uint8Array(await blob.arrayBuffer()))
 }

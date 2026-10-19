@@ -7,7 +7,7 @@ import {
 import type { Azit, InviteCode, Member, ReactOption, Room, Sticker } from '../../api/types'
 import { Shell } from '../../app/Shell'
 import { ago, left, type Me } from '../../lib/chat'
-import { shrinkImage } from '../../lib/image'
+import { prepareMeme, shrinkImage } from '../../lib/image'
 import { ChatScreen } from '../chat/ChatScreen'
 import { NewRoomModal } from '../rooms/NewRoomModal'
 import { RoomList } from '../rooms/RoomList'
@@ -494,7 +494,7 @@ function Memes({ azitId, memes, canDelete, onChanged }: {
   const upload = async (file: File, name: string) => {
     setUploading(true)
     try {
-      const img = await shrinkImage(file, 'meme')
+      const img = await prepareMeme(file) // 움직이는 GIF·WebP 는 그대로
       const key = await uploadFile('meme', img.contentType, img.base64)
       const m = await createMeme(azitId, name, key)
       onChanged([m, ...memes])
