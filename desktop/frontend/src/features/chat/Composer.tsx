@@ -61,7 +61,7 @@ export function Composer({ draft = '', popup = null, mentionCandidates = [], men
         </div>
       )}
       {popup === 'mention' && mentionCandidates.length > 0 && (
-        <div className="popup mention" role="listbox" aria-label="흔들 사람">
+        <div className="popup mention-pop" role="listbox" aria-label="흔들 사람">
           <span className="popup-title">누구를 흔들까요?</span>
           {mentionCandidates.map((m, i) => (
             <button

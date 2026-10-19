@@ -181,7 +181,8 @@ textarea.composer-input { resize: none; }
 /* 입력창 위에 뜨는 메뉴 위치 */
 .composer .popup { bottom: 66px; left: 14px; }
 .composer .popup.narrow { width: min(260px, calc(100% - 28px)); }
-.composer .popup.mention { width: min(280px, calc(100% - 28px)); }
+/* @ 후보 창. 이름이 .mention(메시지 속 @칩)과 겹치면 칩 모양(높이 22px)이 먹어서 창이 찌그러지니 따로 둔다 */
+.composer .popup.mention-pop { width: min(280px, calc(100% - 28px)); max-height: 320px; overflow-y: auto; }
 .composer .popup.wide { right: 14px; padding: 12px; max-height: 340px; }
 .popup-bar { padding: 0 4px 10px; display: flex; align-items: center; gap: 8px; }
 
