@@ -6,11 +6,11 @@
 
 | 운영체제 | 설치 파일 |
 | --- | --- |
-| Windows 10 / 11 | [azit-windows-setup.exe](https://api.togetherbros.uk/download/azit-windows-setup.exe) |
-| macOS (Intel · Apple Silicon) | [azit-mac.zip](https://api.togetherbros.uk/download/azit-mac.zip) |
-| Linux | [azit-linux.AppImage](https://api.togetherbros.uk/download/azit-linux.AppImage) |
+| Windows 10 / 11 | [azit-windows-setup.exe](https://github.com/TogetherBros/azit/releases/latest/download/azit-windows-setup.exe) |
+| macOS (Intel · Apple Silicon) | [azit-mac.zip](https://github.com/TogetherBros/azit/releases/latest/download/azit-mac.zip) |
+| Linux | [azit-linux.AppImage](https://github.com/TogetherBros/azit/releases/latest/download/azit-linux.AppImage) |
 
-위 링크가 안 열리면 [GitHub 최신 릴리스](https://github.com/TogetherBros/azit/releases/latest)에서 같은 파일을 받아요.
+링크는 늘 [GitHub 최신 릴리스](https://github.com/TogetherBros/azit/releases/latest)의 파일을 가리켜요. 지난 버전도 [릴리스 목록](https://github.com/TogetherBros/azit/releases)에 있어요.
 
 한 번 설치하면 새 버전이 나올 때 앱이 알려 줘요. 다시 찾아올 필요 없어요.
 
@@ -71,7 +71,7 @@ wails3 dev
 
 ### 새 버전 내기
 
-`v` 로 시작하는 태그를 올리면 GitHub Actions 가 Windows·macOS·Linux 로 빌드해서 위 다운로드 주소에 올려요 (`.github/workflows/release-desktop.yml`).
+`v` 로 시작하는 태그를 올리면 GitHub Actions 가 Windows·macOS·Linux 로 빌드해서 GitHub Release 로 올려요. 위 받기 링크와 앱의 업데이트 확인(`latest.json`)이 자동으로 새 버전을 가리켜요 (`.github/workflows/release-desktop.yml`).
 
 ```bash
 git tag -a v0.2.0 -m "고친 것: ..."   # -m 내용이 앱의 업데이트 알림에 그대로 보여요

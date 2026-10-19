@@ -83,7 +83,7 @@ jobs:
 
       - name: compose 파일 복사
         run: |
-          ssh ec2 "mkdir -p $APP_DIR/caddy $APP_DIR/downloads"
+          ssh ec2 "mkdir -p $APP_DIR/caddy"
           scp deploy/docker-compose.yml "ec2:$APP_DIR/"
           scp deploy/Caddyfile "ec2:$APP_DIR/caddy/"
 

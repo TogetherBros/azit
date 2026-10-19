@@ -1,18 +1,19 @@
-# 데스크톱 앱 릴리스: v 로 시작하는 태그를 push 하면 3개 OS 로 빌드해서 배포한다.
+# 데스크톱 앱 릴리스: v 로 시작하는 태그를 push 하면 3개 OS 로 빌드해서 GitHub Release 로 배포한다.
 #
-#   git tag -a v0.2.0 -m "고친 것: ..."      # -m 내용이 앱의 업데이트 창에 그대로 보인다
+#   git tag -a v0.2.0 -m "고친 것: ..."      # -m 내용이 릴리스 설명과 앱의 업데이트 창에 그대로 보인다
 #   git push origin v0.2.0
 #
 # 1) Windows / macOS / Linux 각자 그 OS 의 러너에서 빌드 (Wails 는 OS 별 웹뷰를 써서 각자 빌드해야 함)
 #    - Windows: 설치 파일(NSIS, 관리자 권한 없이 내 계정에 설치)
 #    - macOS:   Intel + Apple Silicon 겸용 .app 을 zip 으로
 #    - Linux:   AppImage (실행 권한 주고 바로 실행)
-# 2) 운영 EC2 의 /opt/azit/downloads 에 설치 파일과 latest.json 을 올림
-#    → https://api.togetherbros.uk/download/ 에서 받기, 앱은 latest.json 을 보고 업데이트 창을 띄움
-# 3) GitHub Releases 에도 같은 파일을 남김 (기록용)
+# 2) GitHub Release 에 올림. 파일 이름이 항상 같아서 아래 주소가 늘 최신 버전을 가리킨다.
+#      https://github.com/TogetherBros/azit/releases/latest/download/azit-windows-setup.exe
+#      https://github.com/TogetherBros/azit/releases/latest/download/azit-mac.zip
+#      https://github.com/TogetherBros/azit/releases/latest/download/azit-linux.AppImage
+#      https://github.com/TogetherBros/azit/releases/latest/download/latest.json  ← 앱이 업데이트 확인에 씀
 #
 # 버전은 태그 하나가 기준이다. 빌드 직전에 version.go 와 build/config.yml 에 태그 값을 넣는다.
-# 시크릿은 deploy-server 와 같은 EC2_HOST, EC2_SSH_KEY, EC2_KNOWN_HOSTS 를 쓴다.
 
 name: release-desktop
 
@@ -121,10 +122,6 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
-    env:
-      EC2_USER: ec2-user
-      DOWNLOAD_DIR: /opt/azit/downloads
-      BASE_URL: https://api.togetherbros.uk/download
     steps:
       - uses: actions/checkout@v6
 
@@ -139,44 +136,23 @@ jobs:
           # annotated 태그(-m)의 내용을 업데이트 안내 문구로 쓴다. 없으면 빈 문자열.
           git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
           NOTES=$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME" | sed '/^-----BEGIN/,$d')
-          # 파일 이름이 버전마다 같아서, 주소 뒤에 ?v= 를 붙여 브라우저 캐시를 피한다
-          jq -n --arg v "$VERSION" --arg n "$NOTES" --arg b "$BASE_URL" '{
+          BASE="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME"
+          jq -n --arg v "$VERSION" --arg n "$NOTES" --arg b "$BASE" '{
             version: $v,
             notes: $n,
             files: {
-              windows: "\($b)/azit-windows-setup.exe?v=\($v)",
-              darwin:  "\($b)/azit-mac.zip?v=\($v)",
-              linux:   "\($b)/azit-linux.AppImage?v=\($v)"
+              windows: "\($b)/azit-windows-setup.exe",
+              darwin:  "\($b)/azit-mac.zip",
+              linux:   "\($b)/azit-linux.AppImage"
             }
           }' > dist/latest.json
           cat dist/latest.json
           ls -la dist
 
-      - name: SSH 준비
-        env:
-          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
-        run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          printf '%s\n' "$EC2_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          printf 'Host ec2\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/id_deploy\n' \
-            "${{ secrets.EC2_HOST }}" "$EC2_USER" > ~/.ssh/config
-
-      # 설치 파일을 먼저 올리고 latest.json 을 마지막에 바꾼다.
-      # 그래야 앱이 새 버전을 알았을 때 파일이 이미 받을 수 있는 상태다.
-      - name: EC2 에 올리기
-        run: |
-          ssh ec2 "mkdir -p $DOWNLOAD_DIR"
-          scp dist/azit-windows-setup.exe dist/azit-mac.zip dist/azit-linux.AppImage "ec2:$DOWNLOAD_DIR/"
-          scp dist/latest.json "ec2:$DOWNLOAD_DIR/latest.json.new"
-          ssh ec2 "mv $DOWNLOAD_DIR/latest.json.new $DOWNLOAD_DIR/latest.json"
-          curl -fsS "$BASE_URL/latest.json"
-
-      - name: GitHub Release 남기기
+      # draft 가 아닌 정식 릴리스로 만들어야 releases/latest 가 이 버전을 가리킨다.
+      - name: GitHub Release 만들기
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/azit-* --title "$GITHUB_REF_NAME" --notes-from-tag \
-            || gh release upload "$GITHUB_REF_NAME" dist/azit-* --clobber
+          gh release create "$GITHUB_REF_NAME" dist/* --title "아지트 $GITHUB_REF_NAME" --notes-from-tag --latest \
+            || gh release upload "$GITHUB_REF_NAME" dist/* --clobber
