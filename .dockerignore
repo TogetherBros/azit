@@ -1,0 +1,17 @@
+# docker build 컨텍스트(저장소 루트)에서 서버 이미지에 필요 없는 것들
+.git
+.github
+.idea
+.omc
+.claude
+.handoff
+desktop
+docs
+**/node_modules
+**/.env
+**/*.db
+**/*.db-wal
+**/*.db-shm
+**/*.exe
+**/client_secret*.json
+**/.DS_Store
