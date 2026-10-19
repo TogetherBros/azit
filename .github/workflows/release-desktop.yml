@@ -56,6 +56,13 @@ jobs:
         with:
           node-version: "22"
 
+      # 프론트(frontend/dist)는 Wails 빌드 태스크가 Go 빌드 전에 먼저 만든다.
+      # main.go 에 //go:embed 가 없으면 화면 파일이 exe 에 안 들어가서 빈 창이 뜨니, 빌드 전에 막는다.
+      - name: 화면 파일 embed 확인
+        run: |
+          grep -q '^//go:embed all:frontend/dist' main.go \
+            || { echo "main.go 에 //go:embed all:frontend/dist 가 없어요. 이대로면 빈 창이 떠요."; exit 1; }
+
       - name: 버전 넣기
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
