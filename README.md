@@ -8,7 +8,7 @@
 | --- | --- |
 | Windows 10 / 11 | [azit-windows-setup.exe](https://github.com/TogetherBros/azit/releases/latest/download/azit-windows-setup.exe) |
 | macOS (Intel · Apple Silicon) | [azit-mac.zip](https://github.com/TogetherBros/azit/releases/latest/download/azit-mac.zip) |
-| Linux | [azit-linux.AppImage](https://github.com/TogetherBros/azit/releases/latest/download/azit-linux.AppImage) |
+| Linux | [azit-linux.deb](https://github.com/TogetherBros/azit/releases/latest/download/azit-linux.deb) (Ubuntu · Debian) · [azit-linux.rpm](https://github.com/TogetherBros/azit/releases/latest/download/azit-linux.rpm) (Fedora · openSUSE) · [azit-linux.pkg.tar.zst](https://github.com/TogetherBros/azit/releases/latest/download/azit-linux.pkg.tar.zst) (Arch) |
 
 링크는 늘 [GitHub 최신 릴리스](https://github.com/TogetherBros/azit/releases/latest)의 파일을 가리켜요. 지난 버전도 [릴리스 목록](https://github.com/TogetherBros/azit/releases)에 있어요.
 
@@ -26,11 +26,17 @@
    - 그래도 안 열리면 터미널에서 `xattr -dr com.apple.quarantine /Applications/azit.app`
 
 **Linux**
+
+패키지 관리자가 GTK4·WebKitGTK 6.0 도 함께 설치해요.
+
 ```bash
-chmod +x azit-linux.AppImage
-./azit-linux.AppImage
+sudo apt install ./azit-linux.deb                              # Ubuntu 24.04+ · Debian 13+
+sudo dnf install ./azit-linux.rpm                              # Fedora
+sudo zypper install --allow-unsigned-rpm ./azit-linux.rpm      # openSUSE Tumbleweed
+sudo pacman -U azit-linux.pkg.tar.zst                          # Arch · Manjaro · EndeavourOS
 ```
-켜지지 않으면 `libfuse2` (Ubuntu 24.04 는 `libfuse2t64`) 를 깔아 주세요.
+
+AppImage (`azit-linux.AppImage`) 도 릴리스 페이지에 있지만 Ubuntu 계열 배포판에서만 실행돼요.
 
 ### 처음 쓰기
 

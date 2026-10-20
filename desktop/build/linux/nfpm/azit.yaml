@@ -1,0 +1,40 @@
+# 릴리스 워크플로가 deb, rpm, Arch 패키지에 쓰는 설정이다.
+# 옆의 nfpm.yaml 은 wails3 update build-assets 가 덮어쓰므로 이 파일을 수정한다.
+
+name: "azit"
+arch: ${GOARCH}
+platform: "linux"
+version: "0.0.1" # 릴리스 워크플로가 git 태그로 바꿔 넣는다
+section: "net"
+priority: "optional"
+maintainer: "TogetherBros"
+description: "친구들끼리 쓰는 메신저"
+vendor: "TogetherBros"
+homepage: "https://github.com/TogetherBros/azit"
+release: "1"
+
+contents:
+  - src: "./bin/azit"
+    dst: "/usr/bin/azit"
+  - src: "./build/appicon.png"
+    dst: "/usr/share/pixmaps/azit.png" # 1024x1024 아이콘이라 크기별 디렉터리를 쓰지 않는다
+  - src: "./build/linux/azit.desktop"
+    dst: "/usr/share/applications/azit.desktop"
+
+depends:
+  - "libgtk-4-1"
+  - "libwebkitgtk-6.0-4"
+
+overrides:
+  rpm:
+    depends:
+      # Fedora 와 openSUSE 의 패키지 이름이 달라 둘 다 제공하는 라이브러리 이름에 의존한다.
+      - "libgtk-4.so.1()(64bit)"
+      - "libwebkitgtk-6.0.so.4()(64bit)"
+  archlinux:
+    depends:
+      - "gtk4"
+      - "webkitgtk-6.0"
+
+scripts:
+  postinstall: "./build/linux/nfpm/scripts/postinstall.sh"

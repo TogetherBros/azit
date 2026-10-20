@@ -6,14 +6,17 @@
 # 1) Windows / macOS / Linux 각자 그 OS 의 러너에서 빌드 (Wails 는 OS 별 웹뷰를 써서 각자 빌드해야 함)
 #    - Windows: 설치 파일(NSIS, 관리자 권한 없이 내 계정에 설치)
 #    - macOS:   Intel + Apple Silicon 겸용 .app 을 zip 으로
-#    - Linux:   AppImage (실행 권한 주고 바로 실행)
+#    - Linux:   deb (Ubuntu·Debian), rpm (Fedora·openSUSE), pkg.tar.zst (Arch), AppImage
 # 2) GitHub Release 에 올림. 파일 이름이 항상 같아서 아래 주소가 늘 최신 버전을 가리킨다.
 #      https://github.com/TogetherBros/azit/releases/latest/download/azit-windows-setup.exe
 #      https://github.com/TogetherBros/azit/releases/latest/download/azit-mac.zip
+#      https://github.com/TogetherBros/azit/releases/latest/download/azit-linux.deb
+#      https://github.com/TogetherBros/azit/releases/latest/download/azit-linux.rpm
+#      https://github.com/TogetherBros/azit/releases/latest/download/azit-linux.pkg.tar.zst
 #      https://github.com/TogetherBros/azit/releases/latest/download/azit-linux.AppImage
 #      https://github.com/TogetherBros/azit/releases/latest/download/latest.json  ← 앱이 업데이트 확인에 씀
 #
-# 버전은 태그 하나가 기준이다. 빌드 직전에 version.go 와 build/config.yml 에 태그 값을 넣는다.
+# 버전은 태그 하나가 기준이다. 빌드 직전에 version.go, build/config.yml, build/linux/nfpm/azit.yaml 에 태그 값을 넣는다.
 
 name: release-desktop
 
@@ -70,7 +73,8 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           sed -i.bak "s/^const appVersion = .*/const appVersion = \"$VERSION\"/" version.go
           sed -i.bak "s/^  version: .*/  version: \"$VERSION\"/" build/config.yml
-          rm -f version.go.bak build/config.yml.bak
+          sed -i.bak "s/^version: .*/version: \"$VERSION\"/" build/linux/nfpm/azit.yaml
+          rm -f version.go.bak build/config.yml.bak build/linux/nfpm/azit.yaml.bak
           grep -n appVersion version.go
 
       # wails3 CLI 자체도 리눅스에선 GTK 헤더가 있어야 컴파일돼서, wails3 설치보다 먼저 깐다.
@@ -110,6 +114,13 @@ jobs:
               ;;
             linux)
               wails3 task linux:create:appimage
+              # AppImage 태스크가 만든 실행 파일과 데스크톱 파일을 그대로 패키징한다.
+              wails3 task linux:generate:deb
+              wails3 task linux:generate:rpm
+              wails3 task linux:generate:aur
+              cp bin/azit.deb dist/azit-linux.deb
+              cp bin/azit.rpm dist/azit-linux.rpm
+              cp bin/azit.pkg.tar.zst dist/azit-linux.pkg.tar.zst
               cp bin/*.AppImage dist/azit-linux.AppImage
               ;;
           esac
@@ -139,13 +150,15 @@ jobs:
           git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
           NOTES=$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME" | sed '/^-----BEGIN/,$d')
           BASE="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME"
-          jq -n --arg v "$VERSION" --arg n "$NOTES" --arg b "$BASE" '{
+          RELEASE_PAGE="https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME"
+          # Linux 파일이 배포판별로 나뉘어 앱에서 릴리스 페이지를 연다.
+          jq -n --arg v "$VERSION" --arg n "$NOTES" --arg b "$BASE" --arg l "$RELEASE_PAGE" '{
             version: $v,
             notes: $n,
             files: {
               windows: "\($b)/azit-windows-setup.exe",
               darwin:  "\($b)/azit-mac.zip",
-              linux:   "\($b)/azit-linux.AppImage"
+              linux:   $l
             }
           }' > dist/latest.json
           cat dist/latest.json
